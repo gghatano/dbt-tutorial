@@ -1,0 +1,53 @@
+version: 2
+
+sources:
+  - name: raw
+    schema: raw
+    description: "ELT raw layer (CSV inserted by load_raw_data.py)"
+    tables:
+      - name: customers
+        description: "Customer master (1,000 rows). Loaded from data/raw/customers.csv."
+        columns:
+          - name: customer_id
+            description: "Primary key."
+            tests:
+              - not_null
+              - unique
+          - name: customer_name
+          - name: email
+          - name: created_at
+      - name: products
+        description: "Product master (100 rows)."
+        columns:
+          - name: product_id
+            description: "Primary key."
+            tests:
+              - not_null
+              - unique
+          - name: product_name
+          - name: category
+          - name: unit_price
+      - name: stores
+        description: "Store master (20 rows)."
+        columns:
+          - name: store_id
+            description: "Primary key."
+            tests:
+              - not_null
+              - unique
+          - name: store_name
+          - name: prefecture
+      - name: orders
+        description: "Order transactions (10,000 rows)."
+        columns:
+          - name: order_id
+            description: "Primary key."
+            tests:
+              - not_null
+              - unique
+          - name: order_date
+          - name: customer_id
+          - name: product_id
+          - name: store_id
+          - name: quantity
+          - name: unit_price

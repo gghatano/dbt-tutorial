@@ -1,0 +1,85 @@
+version: 2
+
+models:
+  - name: stg_customers
+    description: "Type-cast view of raw.customers."
+    columns:
+      - name: customer_id
+        description: "Primary key (bigint)."
+        tests:
+          - not_null
+          - unique
+      - name: customer_name
+        description: "Customer display name."
+      - name: email
+        description: "Customer email."
+      - name: created_at
+        description: "Customer registration date (date)."
+
+  - name: stg_products
+    description: "Type-cast view of raw.products."
+    columns:
+      - name: product_id
+        description: "Primary key (bigint)."
+        tests:
+          - not_null
+          - unique
+      - name: product_name
+      - name: category
+      - name: unit_price
+        description: "Unit price (numeric(12,2)). Non-negative is asserted via singular tests in phase-06."
+        tests:
+          - not_null
+
+  - name: stg_stores
+    description: "Type-cast view of raw.stores."
+    columns:
+      - name: store_id
+        description: "Primary key (bigint)."
+        tests:
+          - not_null
+          - unique
+      - name: store_name
+      - name: prefecture
+
+  - name: stg_orders
+    description: "Type-cast view of raw.orders."
+    columns:
+      - name: order_id
+        description: "Primary key (bigint)."
+        tests:
+          - not_null
+          - unique
+      - name: order_date
+        tests:
+          - not_null
+      - name: customer_id
+        description: "FK to stg_customers.customer_id."
+        tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('stg_customers')
+                field: customer_id
+      - name: product_id
+        description: "FK to stg_products.product_id."
+        tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('stg_products')
+                field: product_id
+      - name: store_id
+        description: "FK to stg_stores.store_id."
+        tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('stg_stores')
+                field: store_id
+      - name: quantity
+        tests:
+          - not_null
+      - name: unit_price
+        tests:
+          - not_null

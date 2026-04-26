@@ -1,0 +1,14 @@
+local_analytics:
+  target: dev
+  outputs:
+    dev:
+      type: postgres
+      host: "{{ env_var('DB_HOST', 'localhost') }}"
+      port: "{{ env_var('DB_PORT', '5432') | int }}"
+      user: "{{ env_var('DB_USER', 'dbt_user') }}"
+      password: "{{ env_var('DB_PASSWORD', 'dbt_password') }}"
+      dbname: "{{ env_var('DB_NAME', 'analytics') }}"
+      schema: staging
+      threads: 4
+      sslmode: disable
+      keepalives_idle: 0
