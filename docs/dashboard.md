@@ -19,7 +19,53 @@ docker inspect --format '{{.State.Health.Status}}' local-data-metabase
 
 ヘルシーになったらブラウザで <http://localhost:3000> を開く。
 
-## 初回セットアップ（ブラウザ操作）
+## 自動セットアップ（推奨）
+
+`docker compose up -d metabase` 後、`scripts/metabase_bootstrap.py` を実行すると以下が一発で揃う:
+
+- 管理者アカウント作成（`.env` の `METABASE_ADMIN_*`）
+- Postgres を `local-analytics` として登録（接続ユーザは `readonly_user`）
+- Collection `Sales Marts` 作成
+- 3 つの Card 作成（Daily Sales / Top 20 Customers / Sales by Category）
+- Dashboard `Sales Overview` 作成 + Card 配置（grid 12 列、上段に Daily Sales / 下段に他 2 枚）
+
+実行:
+
+```bash
+# 1) 仮想環境の用意（既にあればスキップ）
+uv venv --python 3.12
+uv pip install -r requirements.txt
+
+# 2) .env に METABASE_* 変数を記述（.env.example 参照）
+
+# 3) bootstrap 実行
+.venv/bin/python scripts/metabase_bootstrap.py
+```
+
+完了すると最後に Dashboard URL が出力される（例: `http://localhost:3000/dashboard/2`）。
+
+### 冪等性
+
+- 名前 (`Sales Marts` collection / 3 Card / `Sales Overview` dashboard) で upsert するため、
+  何度再実行しても重複作成されない。Card は SQL / 可視化設定が常に最新版に**更新**される。
+- 「Metabase 既にセットアップ済み」かどうかは `/api/session/properties` の
+  `has-user-setup` で判定する（`setup-token` はセットアップ完了後も値が残るため
+  単独では判定に使えない、というのが Metabase API のクセ）。
+- 既に管理者が居る環境では、`.env` の admin 認証情報でログインして DB / collection /
+  card / dashboard を ensure するフォールバックパスに入る。
+
+### パスワード方針
+
+`.env` の `METABASE_ADMIN_PASSWORD` は学習用デフォルトとして
+`Local-data-1` を採用（Metabase の要件 = 6 文字以上 + 大文字 + 小文字 + 数字 + 記号 を満たす）。
+本番想定では各自書き換えてから初回 bootstrap を実行する。
+
+## マニュアル操作（リファレンス）
+
+> ※ 以下は API 自動化を使わず、ブラウザで全部やる場合の手順。
+> 通常は上の「自動セットアップ」で十分。
+
+### 初回セットアップ（ブラウザ操作）
 
 1. 「ようこそ」画面 → 言語選択（日本語可）
 2. 管理者アカウント作成（メールアドレスは何でもよい。学習用なので `admin@local.test` 等）
@@ -34,11 +80,12 @@ docker inspect --format '{{.State.Health.Status}}' local-data-metabase
    - スキーマ: 空欄（全 schema を見せる）
 4. 接続成功後、利用統計の収集設定 → 完了
 
-## 推奨ダッシュボード
+### 推奨ダッシュボード
 
-ログイン後、以下のクエリで「最初の 1 枚」を作ってみる。
+ログイン後、以下のクエリで「最初の 1 枚」を作ってみる
+（`scripts/metabase_bootstrap.py` でも同じクエリが自動投入される）。
 
-### 日次売上推移（折れ線）
+#### 日次売上推移（折れ線）
 
 ```sql
 select order_date, total_sales_amount
@@ -48,7 +95,7 @@ order by order_date
 
 → 「グラフタイプ：折れ線」「X 軸：order_date / Y 軸：total_sales_amount」。
 
-### 顧客別売上 TOP20（棒）
+#### 顧客別売上 TOP20（棒）
 
 ```sql
 select customer_name, total_sales_amount
@@ -59,7 +106,7 @@ limit 20
 
 → 「棒グラフ」「X 軸：customer_name / Y 軸：total_sales_amount」。
 
-### 商品カテゴリ別売上（円グラフ）
+#### 商品カテゴリ別売上（円グラフ）
 
 ```sql
 select category, sum(total_sales_amount) as total
