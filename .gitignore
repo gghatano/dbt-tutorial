@@ -11,6 +11,8 @@ __pycache__/
 # Data (re-generatable)
 data/raw/*.csv
 !data/raw/.gitkeep
+data/exercises/inbox/*.csv
+!data/exercises/inbox/.gitkeep
 
 # Terraform
 **/.terraform/

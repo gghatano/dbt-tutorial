@@ -144,6 +144,7 @@ cd dbt
 ## ドキュメント
 
 - **[docs/spec.md](docs/spec.md)** — プロジェクト仕様。完了条件はここの §13 が単一基準。
+- **[docs/exercises/](docs/exercises/README.md)** — MVP 完了後に取り組む 5 問の練習問題セット（CSV 取り込み / マート / incremental / snapshot / seed+macro）。
 - **[docs/tasks/](docs/tasks/)** — phase / task 単位の進捗とログ。
   - phase-01: 環境構築
   - phase-02: Terraform IaC
