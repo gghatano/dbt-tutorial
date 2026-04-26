@@ -128,8 +128,13 @@ cd dbt
 │   │   ├── staging/           # stg_* (view)
 │   │   ├── intermediate/      # int_* (view)
 │   │   └── marts/             # mart_* (table)
-│   └── macros/
-│       └── get_custom_schema.sql  # generate_schema_name override
+│   ├── macros/
+│   │   └── get_custom_schema.sql  # generate_schema_name override
+│   └── tests/                 # singular tests (custom 4 本)
+│       ├── assert_positive_sales_amount.sql
+│       ├── assert_positive_quantity.sql
+│       ├── assert_marts_total_sales_non_negative.sql
+│       └── assert_daily_sales_not_empty.sql
 └── docs/
     ├── spec.md                # プロジェクト仕様（本ドキュメントの権威）
     ├── tasks/                 # phase-NN/task-MMM.md でタスク管理
@@ -151,6 +156,9 @@ cd dbt
   - [0002 ツールチェーン現況と Docker credsStore 問題](docs/decisions/0002-tooling-baseline.md)
   - [0004 raw ロード戦略](docs/decisions/0004-raw-load-strategy.md)
   - [0005 dbt 設定（schema 解決 macro）](docs/decisions/0005-dbt-config.md)
+  - [0006 intermediate / marts のモデリング方針](docs/decisions/0006-marts-modeling.md)
+  - [0008 smoke_test の検査範囲](docs/decisions/0008-smoke-test-strategy.md)
+  - [0009 プロジェクト完了サマリ](docs/decisions/0009-project-completion-summary.md)
 
 ## トラブルシュート
 
@@ -176,6 +184,46 @@ docker compose ps                              # postgres healthy 確認
 lsof -i :5432                                  # ポート競合確認
 docker exec local-data-postgres pg_isready -U analytics_user -d analytics
 ```
+
+## 完了状況 / Project Status
+
+**プロジェクト完了日**: 2026-04-26
+
+### Phase 到達点
+
+| Phase | 内容 | 主要 commit |
+|---|---|---|
+| phase-01 | 環境構築（Colima + docker compose で Postgres healthy） | `a1eb0e7` |
+| phase-02 | Terraform で 4 schema (`raw`/`staging`/`intermediate`/`marts`) と 2 role (`dbt_user`/`readonly_user`) を構築 | `e765f16` |
+| phase-03 | requirements.txt / uv venv / Faker ダミーデータ生成 / raw 投入 | `8f63a61`, `40f8c5f`, `b6207cb` |
+| phase-04 | dbt project + staging 4 model + sources + built-in tests | `7cbf1a2` |
+| phase-05 | `int_order_details` + mart 3 本 (daily/customer/product sales) | `1e2dd03` |
+| phase-06 | custom singular test 4 本、smoke_test.py、本タスクで README/ADR 仕上げ | `10aa4e8`, `e57a4f1` |
+
+### spec §13 完了条件チェックリスト
+
+end-to-end 再検証（2026-04-26、本ブランチで実行）の結果:
+
+- [x] `docker compose up -d` で PostgreSQL が起動する → `Up (healthy)`
+- [x] Terraform で schema と role が作成されている → `\dn` で `raw / staging / intermediate / marts` (owner=dbt_user)、`pg_roles` に `dbt_user / readonly_user`
+- [x] ダミーデータ CSV が生成される → `customers 1000 / products 100 / stores 20 / orders 10000`（ヘッダ込みの行数 +1 で `wc -l`）
+- [x] raw schema に CSV が投入される → `raw.customers 1,000 / products 100 / stores 20 / orders 10,000`
+- [x] `dbt run` が成功する → `Done. PASS=8 WARN=0 ERROR=0 SKIP=0 NO-OP=0 TOTAL=8`
+- [x] `dbt test` が成功する → `Done. PASS=61 WARN=0 ERROR=0 SKIP=0 NO-OP=0 TOTAL=61`
+- [x] marts schema に 3 mart が作成される → `mart_customer_sales / mart_daily_sales / mart_product_sales` (table, owner=dbt_user)
+- [x] `dbt docs generate` が成功する → `target/manifest.json` (683KB) と `target/catalog.json` (10KB) を生成
+- [x] README に環境構築手順・実行手順・トラブルシュートが記載されている → 本 README
+
+参考: `scripts/smoke_test.py` も `[PASS] all smoke checks passed (raw.orders=10000, marts.mart_daily_sales=365)` で exit 0。
+
+### 次フェーズ候補（spec §14）
+
+最初の MVP は意図的に最小構成。次フェーズ候補は ADR-0009 に整理:
+
+- スケジューラ（Airflow / Dagster）導入
+- クラウド DWH（BigQuery / Snowflake / Redshift）への dbt-adapter 切替
+- CI/CD（GitHub Actions で `dbt build` / smoke）
+- BI（Metabase / Superset）の追加
 
 ## ライセンス
 
