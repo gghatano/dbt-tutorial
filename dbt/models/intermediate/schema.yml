@@ -1,0 +1,61 @@
+version: 2
+
+models:
+  - name: int_order_details
+    description: |
+      Order fact enriched with customer, product, and store master attributes.
+      `sales_amount` is computed as `quantity * unit_price` cast to numeric(14,2).
+      Joins are INNER because stg_orders FK columns are validated by
+      relationships tests in staging/schema.yml.
+    columns:
+      - name: order_id
+        description: "Primary key (bigint)."
+        tests:
+          - not_null
+          - unique
+      - name: order_date
+        description: "Order date (date)."
+        tests:
+          - not_null
+      - name: customer_id
+        description: "FK to stg_customers.customer_id."
+        tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('stg_customers')
+                field: customer_id
+      - name: customer_name
+        description: "Customer display name (denormalized from stg_customers)."
+      - name: product_id
+        description: "FK to stg_products.product_id."
+        tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('stg_products')
+                field: product_id
+      - name: product_name
+        description: "Product name (denormalized from stg_products)."
+      - name: category
+        description: "Product category (denormalized from stg_products)."
+      - name: store_id
+        description: "FK to stg_stores.store_id."
+        tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('stg_stores')
+                field: store_id
+      - name: quantity
+        description: "Order quantity (int)."
+        tests:
+          - not_null
+      - name: unit_price
+        description: "Unit price at the time of order (numeric(12,2))."
+        tests:
+          - not_null
+      - name: sales_amount
+        description: "quantity * unit_price (numeric(14,2))."
+        tests:
+          - not_null

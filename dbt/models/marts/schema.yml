@@ -1,0 +1,89 @@
+version: 2
+
+models:
+  - name: mart_daily_sales
+    description: "Daily sales aggregation (one row per order_date)."
+    columns:
+      - name: order_date
+        description: "Calendar date of the orders. Primary key."
+        tests:
+          - not_null
+          - unique
+      - name: order_count
+        description: "Number of orders on this date."
+        tests:
+          - not_null
+      - name: customer_count
+        description: "Distinct customers placing an order on this date."
+        tests:
+          - not_null
+      - name: total_quantity
+        description: "Sum of quantity on this date."
+        tests:
+          - not_null
+      - name: total_sales_amount
+        description: "Sum of sales_amount on this date (numeric(18,2))."
+        tests:
+          - not_null
+
+  - name: mart_customer_sales
+    description: "Customer-level sales aggregation (one row per customer)."
+    columns:
+      - name: customer_id
+        description: "Primary key. FK to stg_customers.customer_id."
+        tests:
+          - not_null
+          - unique
+      - name: customer_name
+      - name: order_count
+        tests:
+          - not_null
+      - name: total_sales_amount
+        description: "Lifetime sales amount per customer (numeric(18,2))."
+        tests:
+          - not_null
+      - name: first_order_date
+        description: "Earliest order_date for this customer."
+        tests:
+          - not_null
+      - name: last_order_date
+        description: "Latest order_date for this customer."
+        tests:
+          - not_null
+
+  - name: mart_product_sales
+    description: "Product-level sales aggregation (one row per product)."
+    columns:
+      - name: product_id
+        description: "Primary key. FK to stg_products.product_id."
+        tests:
+          - not_null
+          - unique
+      - name: product_name
+      - name: category
+        description: |
+          Product category. Constrained to the static CATEGORIES list defined
+          in scripts/generate_dummy_data.py (see decisions/0006).
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values:
+                  - Food
+                  - Beverage
+                  - Household
+                  - Beauty
+                  - Electronics
+                  - Stationery
+                  - Apparel
+                  - Toy
+      - name: order_count
+        tests:
+          - not_null
+      - name: total_quantity
+        tests:
+          - not_null
+      - name: total_sales_amount
+        description: "Lifetime sales amount per product (numeric(18,2))."
+        tests:
+          - not_null
