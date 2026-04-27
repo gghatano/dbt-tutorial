@@ -1,0 +1,74 @@
+# Grading for 100-knock Topic 1 / Q8: reviews.csv with ~10% NULL comments.
+# Run: python3 scripts/grader/grade.py --grading-file docs/exercises/100-knock/topic-1-data-generation/1-8-nullable-comments.grading.yaml
+#
+# DESIGN NOTE: `comment` is intentionally OMITTED from expect_no_nulls.
+# The whole point of this exercise is to keep `comment` nullable on purpose.
+# Adding `comment` here would contradict the learning goal.
+
+exercise: 100-knock-1-8-nullable-comments
+title: "1-8: comment 列に約 10% NULL を混ぜる (reviews 想定)"
+passing_score: 80
+
+expects_learner_files:
+  - scripts/100-knock/topic-1/generate_1_8_nullable_comments.py
+
+checks:
+  - id: script-exists
+    description: "学習者が generate_1_8_nullable_comments.py を作成した"
+    type: file_exists
+    path: scripts/100-knock/topic-1/generate_1_8_nullable_comments.py
+    points: 10
+
+  - id: script-runs
+    description: "スクリプト実行が成功する (exit 0)"
+    type: shell_command
+    command: ["python3", "scripts/100-knock/topic-1/generate_1_8_nullable_comments.py"]
+    points: 15
+
+  - id: csv-row-count-and-pk
+    description: "reviews.csv が 2000 行 + ヘッダ、review_id ユニーク、必須列に NULL なし"
+    type: csv_assert
+    path: data/100-knock/topic-1/reviews.csv
+    expect_rows: 2000
+    expect_columns: [review_id, customer_id, product_id, rating, comment, posted_at]
+    expect_unique: [review_id]
+    # NOTE: `comment` は意図的に NULL 許容なのでここに含めない。
+    expect_no_nulls: [review_id, customer_id, product_id, rating, posted_at]
+    points: 30
+
+  - id: comment-null-ratio
+    description: "comment 列の NULL 比率が 10% ± 3% (= 7%..13%)"
+    type: shell_command
+    command: |
+      python3 -c "
+      import csv
+      total = 0
+      nulls = 0
+      with open('data/100-knock/topic-1/reviews.csv') as f:
+          for row in csv.DictReader(f):
+              total += 1
+              if row['comment'] == '' or row['comment'] is None:
+                  nulls += 1
+      ratio = nulls / total * 100
+      print(f'null={nulls} total={total} ratio={ratio:.1f}%')
+      assert 7.0 <= ratio <= 13.0, f'comment NULL ratio {ratio:.1f}% out of [7, 13]'
+      "
+    expect_stdout_match: "ratio=(7|8|9|10|11|12|13)\\."
+    points: 35
+
+  - id: comment-not-all-null
+    description: "comment 列が全 NULL ではない (= 90% 程度は実テキストが入っている)"
+    type: shell_command
+    command: |
+      python3 -c "
+      import csv
+      filled = 0
+      with open('data/100-knock/topic-1/reviews.csv') as f:
+          for row in csv.DictReader(f):
+              if row['comment']:
+                  filled += 1
+      print(f'filled={filled}')
+      assert filled >= 1700, f'expected >=1700 non-null comments, got {filled}'
+      "
+    expect_stdout_match: "filled=(17|18|19)[0-9][0-9]|filled=2000"
+    points: 10
