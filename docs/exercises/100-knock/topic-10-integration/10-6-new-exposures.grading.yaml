@@ -1,0 +1,76 @@
+# Grading definition for 100-knock Topic 10, Problem 10-6
+# (Declare 2 exposures: BI dashboard + reverse ETL, both maturity: high)
+# Run by:
+#   python3 scripts/grader/grade.py \
+#     --grading-file docs/exercises/100-knock/topic-10-integration/10-6-new-exposures.grading.yaml
+#
+# 採点方針:
+#   - 構造チェック (file_exists / parse / 2 manifest_node) で 50 点
+#   - 配置 / config (maturity: high) チェック で 30 点
+#   - 起点 build 確認 (dbt ls --select +exposure:) で 20 点
+
+exercise: 100-knock-10-6-new-exposures
+title: "100-knock 10-6: 新ドメインの exposure を 2 つ宣言 (dashboard + reverse_etl, maturity: high)"
+passing_score: 80
+
+expects_learner_files:
+  - dbt/models/100-knock/topic-10/exposures.yml
+
+checks:
+  # ----- 構造チェック (50 点) -----
+
+  - id: exposures-yml-exists
+    description: "dbt/models/100-knock/topic-10/exposures.yml が存在する"
+    type: file_exists
+    path: dbt/models/100-knock/topic-10/exposures.yml
+    min_size_bytes: 200
+    points: 10
+
+  - id: parse-success
+    description: "dbt parse が成功する (exposures.yml の構文 OK)"
+    type: dbt_command
+    command: ["dbt", "parse"]
+    points: 10
+
+  - id: dashboard-exposure-registered
+    description: "manifest に exposure.local_analytics.churn_dashboard_100knock が登録されている"
+    type: manifest_node_exists
+    node: exposure.local_analytics.churn_dashboard_100knock
+    points: 15
+
+  - id: reverse-etl-exposure-registered
+    description: "manifest に exposure.local_analytics.active_subscribers_reverse_etl_100knock が登録されている"
+    type: manifest_node_exists
+    node: exposure.local_analytics.active_subscribers_reverse_etl_100knock
+    points: 15
+
+  # ----- maturity: high チェック (30 点) -----
+
+  - id: dashboard-maturity-high
+    description: "churn_dashboard_100knock の maturity が high に設定されている"
+    type: manifest_config
+    node: exposure.local_analytics.churn_dashboard_100knock
+    expected:
+      maturity: high
+    points: 15
+
+  - id: reverse-etl-maturity-high
+    description: "active_subscribers_reverse_etl_100knock の maturity が high に設定されている"
+    type: manifest_config
+    node: exposure.local_analytics.active_subscribers_reverse_etl_100knock
+    expected:
+      maturity: high
+    points: 15
+
+  # ----- 起点 build / ls 確認 (20 点) -----
+
+  - id: dashboard-exposure-build-startable
+    description: "dbt ls --select +exposure:churn_dashboard_100knock が成功し、上流 mart が列挙される"
+    type: shell_command
+    command: |
+      set -euo pipefail
+      cd dbt
+      out=$(dbt ls --profiles-dir . --select +exposure:churn_dashboard_100knock 2>&1 || true)
+      echo "$out"
+      echo "$out" | grep -q "exposure:"
+    points: 20
