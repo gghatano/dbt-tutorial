@@ -30,6 +30,17 @@
 
 ## 課題
 
+### Step 0: snapshots schema を用意する
+
+Terraform は raw / staging / intermediate / marts の 4 schema しか作っていない。snapshot を `snapshots` schema に置くために事前に手で作る。
+
+```bash
+docker exec -i local-data-postgres psql -U analytics_user -d analytics \
+    -c "CREATE SCHEMA IF NOT EXISTS snapshots AUTHORIZATION dbt_user;"
+```
+
+本番運用なら Terraform に schema を追加するべきだが、本演習では学習目的で手動作成にとどめる（Terraform 拡張は [Exercise 09](09-hooks-and-grants.md) で扱う運用近接の話題）。
+
 ### Step 1: snapshot 定義を書く
 
 `dbt/snapshots/exercises/snap_products.sql` を作る。
@@ -114,7 +125,7 @@ ORDER BY product_id, dbt_valid_from;
 
 ## ヒント（詰まったら）
 
-- **snapshot の schema が `<target>_snapshots` に飛ぶ**: 既存 MVP の `dbt/macros/get_custom_schema.sql` が `generate_schema_name` を override して「`custom_schema_name` をそのまま返す」仕様。snapshot の `target_schema='snapshots'` がそのまま `snapshots` schema として作られる。`snapshots` schema は Postgres 上に存在しない可能性があるので、**事前に手動で `CREATE SCHEMA IF NOT EXISTS snapshots AUTHORIZATION dbt_user;`** を実行する必要があるかもしれない（Terraform で管理されていない schema のため）。
+- **snapshot の schema が `<target>_snapshots` に飛ぶ**: 既存 MVP の `dbt/macros/get_custom_schema.sql` が `generate_schema_name` を override して「`custom_schema_name` をそのまま返す」仕様。snapshot の `target_schema='snapshots'` がそのまま `snapshots` schema として作られる（schema 自体は Step 0 で作成済み）。
 - **strategy の選択**: `timestamp` strategy は CSV に `updated_at` 列があれば最も効率的だが、今の `raw.products` には無い。`check` strategy なら任意の列の値変化を検知してくれる。
 - **`dbt snapshot` を 2 回叩いても何も起きない**: ソース側 (`raw.products`) が変わっていない限り snapshot は no-op（既存行の `dbt_valid_to` も触らない）。Step 3 で v2 を流し込むのを忘れていないか確認。
 - **2 回目で全 100 行に新版が出る**: `check_cols=['unit_price']` ではなく `check_cols=['product_id']` のように **常に変わらない列** を指定すると一切履歴化されないし、逆に存在しない列だと dbt が ERROR で落ちる。`unit_price` を指定する。

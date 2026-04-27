@@ -68,43 +68,22 @@
 
 ### Step 3: `stg_orders_inc.sql` を incremental で実装
 
-`dbt/models/exercises/03/stg_orders_inc.sql`:
+`dbt/models/exercises/03/stg_orders_inc.sql` を作る。
 
-```sql
-{{
-    config(
-        materialized='incremental',
-        unique_key='order_id',
-        incremental_strategy='merge',
-        on_schema_change='fail',
-        schema='staging'
-    )
-}}
+要件:
 
-select
-    order_id,
-    order_date,
-    customer_id,
-    product_id,
-    store_id,
-    quantity,
-    unit_price,
-    loaded_at
-from {{ source('raw_exercise_03', 'orders_increment') }}
+- `config(...)` で `materialized='incremental'` / `unique_key='order_id'`
+- `incremental_strategy='merge'` / `on_schema_change='fail'` / `schema='staging'`
+- 本体 SQL は `select ... from {{ source('raw_exercise_03', 'orders_increment') }}`
+- 2 回目以降のみ差分に絞る:
+  ```jinja
+  {% if is_incremental() %}
+  where loaded_at > (select coalesce(max(loaded_at), '1970-01-01'::timestamp) from {{ this }})
+  {% endif %}
+  ```
+- 初回 / `--full-refresh` 時は `is_incremental()` が False になり、上記 where 節が消えて全件 SELECT になることを確認
 
-{% if is_incremental() %}
-where loaded_at > (select coalesce(max(loaded_at), '1970-01-01'::timestamp) from {{ this }})
-{% endif %}
-```
-
-…を **自分で書く**。上は要件を全部見せてしまう（解答に近い）ので、まずは:
-
-- `materialized='incremental'`
-- `unique_key='order_id'`
-- `is_incremental()` で 2 回目以降のみ `where loaded_at > max(loaded_at)` で絞る
-- `--full-refresh` で初回扱いに戻る
-
-を自力で書けるか試す。詰まったら解答例。
+詰まったら下のヒント、それでも分からなければ解答例。
 
 ### Step 4: 1 日目を投入 → 初回 dbt run
 

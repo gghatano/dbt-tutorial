@@ -79,7 +79,13 @@ cd dbt
 
 - **`avg(rating)` の型**: `avg(rating::numeric)` でキャストすると 4 桁スケールの decimal が返る。`numeric(4,2)` に明示キャストしておくと下流で扱いやすい（マートは `numeric(4,2)` 推奨）。
 - **しきい値フィルタの場所**: 集計直後の WHERE は集計前に評価されるので使えない。CTE で集計を済ませてから次の SELECT で WHERE をかけるか、`HAVING` を使う。今回は CTE 方式が読みやすい。
-- **JOIN 方式**: `mart_product_sales` は全商品 100 件を網羅している（売上 0 の商品も `mart_product_sales` には出ない可能性）。INNER で繋ぐとレビューはあるが売上 0 の商品が落ちる。学習者の好みで INNER / LEFT を選び、解答例の方針と比較すると面白い。
+- **JOIN 方式 (INNER vs LEFT) の判断材料**:
+  1. `mart_product_sales` は `int_order_details` 起点なので、注文ゼロの product は含まれない可能性がある（このダミーデータでは全商品が注文されているが、実運用では珍しくない）
+  2. `int_product_reviews` はレビューがある全商品 (100 種類) を含む
+  3. ビジネス判断: 「レビュー満点だが注文ゼロ」の商品をランキングに残したいか?
+     - 残したい → LEFT JOIN + `COALESCE(total_sales_amount, 0)`
+     - 売れていない商品はランキング無価値 → INNER JOIN
+  4. 自分の選択を `mart_top_rated_products.sql` 冒頭にコメントで残すと、後で読み返したときに思考が辿れる
 - **ref の依存追跡**: `mart_top_rated_products.sql` から `{{ ref('mart_product_sales') }}` を呼ぶと、dbt はこの新マートを `mart_product_sales` の下流として DAG に組み込む。`dbt run --select +mart_top_rated_products` で MVP 側のマートまで一緒に作り直せるか確認すると面白い。
 
 ## 解答例

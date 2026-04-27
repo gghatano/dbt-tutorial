@@ -1,6 +1,6 @@
 # dbt 練習問題セット
 
-`local-data-platform` の MVP（spec §13 完了状態）の上に、**自分で手を動かして dbt の主要機能を一通り触る** ことを目的にした 5 問の練習問題。
+`local-data-platform` の MVP（spec §13 完了状態）の上に、**自分で手を動かして dbt の主要機能を一通り触る** ことを目的にした 10 問の練習問題。
 
 ## 想定する学習者
 
@@ -8,15 +8,22 @@
 - staging / intermediate / marts の 3 層構造をなんとなく理解した
 - 「次は何を触ったらいいか」を探している
 
-## 5 問の概要
+## 10 問の概要
 
-| #  | タイトル                                  | 学べる主要機能                                                         | 目安  |
-|----|-------------------------------------------|--------------------------------------------------------------------------|-------|
-| 01 | [顧客レビューの取り込み](01-ingest-reviews.md)               | CSV → raw、source 追加、staging、`accepted_values` / `relationships` テスト | 30 分 |
-| 02 | [商品評価マートの作成](02-mart-product-rating.md)           | intermediate、複数 staging の JOIN、集計、しきい値フィルタ          | 30 分 |
-| 03 | [新規注文を incremental に取り込む](03-incremental-orders.md) | `materialized: incremental`, `is_incremental()`, `unique_key`, `--full-refresh` | 60 分 |
-| 04 | [価格変動を snapshot で履歴化](04-snapshot-product-price.md) | `dbt snapshot`, `check` strategy, SCD Type-2, `valid_from` / `valid_to` | 60 分 |
-| 05 | [都道府県マスタを seed 化、共通 macro 作成](05-seeds-and-macros.md) | `dbt seed`, jinja macro, `ref()` vs `source()`, DRY    | 45 分 |
+01〜05 は dbt の基本一周（取り込み / マート / incremental / snapshot / seed+macro）、06〜10 は運用に近い機能（exposures / packages / 自作 generic test / hooks / 失敗行のデバッグ）。
+
+| #  | タイトル                                  | 学べる主要機能                                                         | 目安  | 前提依存 |
+|----|-------------------------------------------|--------------------------------------------------------------------------|-------|---------|
+| 01 | [顧客レビューの取り込み](01-ingest-reviews.md)                | CSV → raw、source 追加、staging、`accepted_values` / `relationships` テスト    | 30 分 | なし |
+| 02 | [商品評価マートの作成](02-mart-product-rating.md)            | intermediate、複数 staging の JOIN、集計、しきい値フィルタ                       | 30 分 | 01 |
+| 03 | [新規注文を incremental に取り込む](03-incremental-orders.md) | `materialized: incremental`, `is_incremental()`, `unique_key`, `--full-refresh` | 60 分 | なし |
+| 04 | [価格変動を snapshot で履歴化](04-snapshot-product-price.md)  | `dbt snapshot`, `check` strategy, SCD Type-2, `valid_from` / `valid_to`         | 60 分 | なし |
+| 05 | [都道府県マスタを seed 化、共通 macro 作成](05-seeds-and-macros.md) | `dbt seed`, jinja macro, `ref()` vs `source()`, DRY                          | 45 分 | なし |
+| 06 | [BI を dbt の lineage に組み込む](06-exposures-and-docs.md)   | `exposure:` 宣言、`dbt docs generate`、`dbt ls --select +exposure:`             | 30 分 | dashboard.md |
+| 07 | [dbt-utils でマートを DRY に](07-dbt-utils.md)               | `packages.yml`, `dbt deps`, `dbt_utils.date_spine` / `surrogate_key` / `pivot` | 45 分 | なし |
+| 08 | [自作 generic test を作る](08-custom-generic-test.md)        | `{% test %}` macro、`{{ model }}` / `{{ column_name }}`、引数付き test          | 30 分 | なし |
+| 09 | [on-run-end hook で grants 自動化](09-hooks-and-grants.md)   | `on-run-end` / `pre-hook` / `post-hook`、`run_query`、`+grants:` config        | 45 分 | なし |
+| 10 | [失敗行を追跡する](10-store-failures-and-expectations.md)    | `--store-failures`、`dbt_test__audit` schema、`dbt-expectations`、`severity: warn` | 60 分 | 01, 07 |
 
 ## 進め方
 
