@@ -1,0 +1,79 @@
+# Grading for 100-knock Topic 5 / Q7: groups: + access: で mart オーナーシップ + 公開範囲を宣言
+# Run: python3 scripts/grader/grade.py --grading-file docs/exercises/100-knock/topic-5-mart/5-7-mart-groups-access.grading.yaml
+#
+# 採点方針:
+#   - 構造チェック (file_exists)        25
+#   - parse / manifest 確認              30
+#   - manifest_config (group + access)   25
+#   - dbt build PASS                     20
+#   合計 100、合格 80
+
+exercise: 100-knock-5-7-mart-groups-access
+title: "5-7: mart_customer_lifetime_value_100knock を groups: marts_finance に所属させ access: private を宣言"
+passing_score: 80
+
+expects_learner_files:
+  - dbt/models/100-knock/topic-5/_groups.yml
+  - dbt/models/100-knock/topic-5/mart_customer_lifetime_value_100knock.sql
+
+checks:
+  # ----- 構造チェック (25点) -----
+
+  - id: groups-yml-exists
+    description: "_groups.yml が存在し、marts_finance group が定義されている"
+    type: shell_command
+    command: |
+      set -euo pipefail
+      f=dbt/models/100-knock/topic-5/_groups.yml
+      test -f "${f}"
+      grep -E '^\s*-\s*name:\s*marts_finance\s*$' "${f}" >/dev/null
+    points: 10
+
+  - id: mart-sql-exists
+    description: "mart_customer_lifetime_value_100knock.sql が存在し、config に group/access が含まれる"
+    type: shell_command
+    command: |
+      set -euo pipefail
+      f=dbt/models/100-knock/topic-5/mart_customer_lifetime_value_100knock.sql
+      test -f "${f}"
+      grep -E "group\s*=\s*['\"]marts_finance['\"]" "${f}" >/dev/null
+      grep -E "access\s*=\s*['\"]private['\"]" "${f}" >/dev/null
+    points: 15
+
+  # ----- parse / manifest (30点) -----
+
+  - id: dbt-parse-success
+    description: "dbt parse が成功する (_groups.yml + config の構文 OK)"
+    type: dbt_command
+    command: ["dbt", "parse"]
+    points: 15
+
+  - id: manifest-node-exists
+    description: "manifest に mart_customer_lifetime_value_100knock node が登録されている"
+    type: manifest_node_exists
+    node: model.local_analytics.mart_customer_lifetime_value_100knock
+    points: 15
+
+  # ----- manifest_config (25点) -----
+
+  - id: manifest-config-group-private
+    description: "manifest 上で group=marts_finance かつ access=private が記録されている"
+    type: manifest_config
+    node: model.local_analytics.mart_customer_lifetime_value_100knock
+    expected:
+      config.group: marts_finance
+      access: private
+    points: 25
+
+  # ----- 実行確認 (20点) -----
+
+  - id: dbt-build-mart-success
+    description: "dbt build --select mart_customer_lifetime_value_100knock が PASS"
+    type: shell_command
+    command: |
+      set -euo pipefail
+      cd dbt
+      dbt build --select mart_customer_lifetime_value_100knock --profiles-dir . 2>&1 | tee /tmp/5-7-build.log
+      grep -E 'ERROR=0' /tmp/5-7-build.log >/dev/null
+      ! grep -E 'ERROR=[1-9]' /tmp/5-7-build.log >/dev/null
+    points: 20

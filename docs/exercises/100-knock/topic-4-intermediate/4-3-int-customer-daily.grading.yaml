@@ -1,0 +1,65 @@
+# Grading definition for 100-knock Topic 4, Problem 4-3 (int_customer_daily_activity_100knock + dbt_utils).
+# Run by: python scripts/grader/grade.py --grading-file docs/exercises/100-knock/topic-4-intermediate/4-3-int-customer-daily.grading.yaml
+#
+# 採点方針:
+#   - 構造チェック (file_exists / parse / manifest) で 60 点
+#   - データチェック (sql_assert: 複合 grain unique + 行数 > 0) で 40 点
+#   - 学習者は packages.yml + int_customer_daily_activity_100knock.sql + schema.yml をコミット済み
+#
+# 前提:
+#   - 4-1 完了 (int_order_details_100knock が存在)
+#   - 学習者は dbt deps で dbt-utils を取り込み済み
+#   - dbt parse / dbt run がローカルまたは CI で走る環境
+
+exercise: 100-knock-4-3-int-customer-daily
+title: "100-knock 4-3: int_customer_daily_activity_100knock を複合 grain で作る"
+passing_score: 80
+
+expects_learner_files:
+  - dbt/packages.yml
+  - dbt/models/100-knock/topic-4/int_customer_daily_activity_100knock.sql
+
+checks:
+  # ----- 構造チェック (60 点) -----
+
+  - id: packages-yml-exists
+    description: "dbt/packages.yml が存在し、dbt_utils が含まれている (中身は parse 後 manifest で確認)"
+    type: file_exists
+    path: dbt/packages.yml
+    points: 5
+
+  - id: int-customer-daily-file-exists
+    description: "dbt/models/100-knock/topic-4/int_customer_daily_activity_100knock.sql が存在する"
+    type: file_exists
+    path: dbt/models/100-knock/topic-4/int_customer_daily_activity_100knock.sql
+    points: 15
+
+  - id: parse-success
+    description: "dbt parse が成功する (dbt_utils macro を使った Jinja が解決できる)"
+    type: dbt_command
+    command: ["dbt", "parse"]
+    points: 20
+
+  - id: int-customer-daily-node-registered
+    description: "manifest に model.local_analytics.int_customer_daily_activity_100knock が登録されている"
+    type: manifest_node_exists
+    node: model.local_analytics.int_customer_daily_activity_100knock
+    points: 20
+
+  # ----- データチェック (40 点) -----
+
+  - id: int-customer-daily-rows-positive
+    description: "intermediate.int_customer_daily_activity_100knock が 1 行以上ある"
+    type: sql_assert
+    sql: "SELECT count(*) FROM intermediate.int_customer_daily_activity_100knock"
+    op: gt
+    expected: 0
+    points: 15
+
+  - id: int-customer-daily-grain-unique
+    description: "(customer_id, activity_date) ペアが unique (= 複合 grain が守られている)"
+    type: sql_assert
+    sql: "SELECT count(*) FROM (SELECT customer_id, activity_date FROM intermediate.int_customer_daily_activity_100knock GROUP BY customer_id, activity_date HAVING count(*) > 1) t"
+    op: eq
+    expected: 0
+    points: 25

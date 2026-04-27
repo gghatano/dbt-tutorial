@@ -1,0 +1,64 @@
+# Grading definition for 100-knock Topic 5, Problem 5-5
+# (Declare a Metabase dashboard exposure on top of mart_daily_sales_100knock).
+# Run by:
+#   python3 scripts/grader/grade.py \
+#     --grading-file docs/exercises/100-knock/topic-5-mart/5-5-mart-exposure.grading.yaml
+#
+# 採点方針:
+#   - 構造チェック (file_exists / parse / manifest_node) で 50 点
+#   - 依存チェック (manifest_lineage で mart → exposure のエッジ) で 50 点
+#   - exposure は dbt run の対象ではないので「parse + manifest 登録 + depends_on」 のみで完結
+#
+# 前提:
+#   - 5-3 完了 (mart_daily_sales_100knock が存在し、build 済み)
+#   - 学習者は dbt/models/100-knock/topic-5/exposures.yml を作成
+
+exercise: 100-knock-5-5-mart-exposure
+title: "100-knock 5-5: mart_daily_sales_100knock に exposure: で Metabase ダッシュボードを宣言"
+passing_score: 80
+
+expects_learner_files:
+  - dbt/models/100-knock/topic-5/exposures.yml
+
+checks:
+  # ----- 構造チェック (50 点) -----
+
+  - id: exposures-yml-exists
+    description: "dbt/models/100-knock/topic-5/exposures.yml が存在する"
+    type: file_exists
+    path: dbt/models/100-knock/topic-5/exposures.yml
+    points: 15
+
+  - id: parse-success
+    description: "dbt parse が成功する (exposures.yml の構文 OK)"
+    type: dbt_command
+    command: ["dbt", "parse"]
+    points: 15
+
+  - id: exposure-node-registered
+    description: "manifest に exposure.local_analytics.daily_sales_dashboard_100knock が登録されている"
+    type: manifest_node_exists
+    node: exposure.local_analytics.daily_sales_dashboard_100knock
+    points: 20
+
+  # ----- 依存チェック (50 点) -----
+
+  - id: exposure-depends-on-mart-daily-sales
+    description: "exposure が mart_daily_sales_100knock を depends_on に宣言している"
+    type: manifest_lineage
+    node: exposure.local_analytics.daily_sales_dashboard_100knock
+    upstream_min_count: 1
+    upstream_must_include:
+      - model.local_analytics.mart_daily_sales_100knock
+    points: 30
+
+  - id: exposure-listed-by-selector
+    description: "dbt ls --select +exposure:daily_sales_dashboard_100knock で mart_daily_sales_100knock が列挙される"
+    type: shell_command
+    command: |
+      set -euo pipefail
+      cd dbt
+      out=$(dbt ls --profiles-dir . --select +exposure:daily_sales_dashboard_100knock 2>&1 || true)
+      echo "$out"
+      echo "$out" | grep -q "mart_daily_sales_100knock"
+    points: 20
