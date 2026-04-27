@@ -1,0 +1,66 @@
+# Grading definition for Exercise 04 (snapshot で価格履歴化).
+# Run by: python scripts/grader/grade.py --exercise 04
+#
+# CI 前提:
+#   - `snapshots` schema が事前に作成されている (Step 0)
+#     例: docker exec ... psql -c "CREATE SCHEMA IF NOT EXISTS snapshots AUTHORIZATION dbt_user;"
+#   - 採点直前に `dbt snapshot --select snap_products` を 1 回実行し、
+#     `snapshots.snap_products` が 100 行になっている状態を想定する。
+#     2 回目 (raw.products v2 投入後の 120 行) は workflow 側で別途検証する設計でも良い。
+
+exercise: 04-snapshot-product-price
+title: "Exercise 04: 価格変動を snapshot で履歴化する"
+passing_score: 80   # need >= 80% of total points to PASS
+
+expects_learner_files:
+  - dbt/snapshots/exercises/snap_products.sql
+
+checks:
+  # ----- structural (manifest-only, no DB needed) -----
+
+  - id: parse-success
+    description: "dbt parse が成功する (snapshot ブロックの構文 OK)"
+    type: dbt_command
+    command: ["dbt", "parse"]
+    points: 10
+
+  - id: snapshot-file-exists
+    description: "dbt/snapshots/exercises/snap_products.sql が存在する"
+    type: file_exists
+    path: dbt/snapshots/exercises/snap_products.sql
+    points: 10
+
+  - id: snapshot-node-declared
+    description: "manifest に snapshot.local_analytics.snap_products が登録されている"
+    type: manifest_node_exists
+    node: snapshot.local_analytics.snap_products
+    points: 20
+
+  - id: snapshot-config-strategy-check
+    description: "snap_products の config が strategy=check / unique_key=product_id / target_schema=snapshots を持つ"
+    type: manifest_config
+    node: snapshot.local_analytics.snap_products
+    expected:
+      strategy: check
+      unique_key: product_id
+      target_schema: snapshots
+    points: 25
+
+  - id: snapshot-depends-on-raw-products
+    description: "snap_products が source('raw', 'products') を depends_on として宣言している"
+    type: manifest_lineage
+    node: snapshot.local_analytics.snap_products
+    upstream_min_count: 1
+    upstream_must_include:
+      - source.local_analytics.raw.products
+    points: 15
+
+  # ----- data check (DB 必須, snapshot 1 回目実行後を想定) -----
+
+  - id: snapshot-row-count-100
+    description: "1 回目の dbt snapshot 実行後、snapshots.snap_products が 100 行ある"
+    type: sql_assert
+    sql: "SELECT count(*)::int FROM snapshots.snap_products"
+    op: gte
+    expected: 100
+    points: 20

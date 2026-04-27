@@ -1,0 +1,67 @@
+# Grading definition for Exercise 08 (custom generic test).
+# Run by: python scripts/grader/grade.py --exercise 08
+#
+# 採点方針:
+#   - 構造チェック (file_exists / dbt_command parse) で 40 点
+#   - データチェック (dbt_test_passes) で 60 点
+#   - 学習者は最低でも Step 1〜3 (positive_value generic test 作成と適用) を
+#     完了している必要がある。Step 5 (in_range) はオプション扱いで file_exists のみ。
+#
+# 前提:
+#   - 学習者は dbt/tests/generic/test_positive_value.sql と
+#     dbt/models/exercises/08/schema.yml をコミット済みであること
+#   - dbt parse / dbt test がローカルまたは CI で走る環境であること
+#   - 他 Exercise との依存なし (MVP HEAD があれば動く)
+
+exercise: 08-custom-generic-test
+title: "Exercise 08: 自作 generic test を作る"
+passing_score: 80   # need >= 80% of total points to PASS
+
+expects_learner_files:
+  - dbt/tests/generic/test_positive_value.sql
+  - dbt/models/exercises/08/schema.yml
+
+checks:
+  # ----- 構造チェック (40点) -----
+
+  - id: parse-success
+    description: "dbt parse が成功する (generic test の Jinja 構文 OK)"
+    type: dbt_command
+    command: ["dbt", "parse"]
+    points: 15
+
+  - id: positive-value-test-file-exists
+    description: "dbt/tests/generic/test_positive_value.sql が存在する"
+    type: file_exists
+    path: dbt/tests/generic/test_positive_value.sql
+    points: 15
+
+  - id: exercise-08-schema-file-exists
+    description: "dbt/models/exercises/08/schema.yml が存在し generic test を model に紐付けている"
+    type: file_exists
+    path: dbt/models/exercises/08/schema.yml
+    points: 10
+
+  # ----- データチェック (60点) -----
+
+  - id: positive-value-tests-pass-on-stg-orders
+    description: "stg_orders に対する positive_value test (quantity / unit_price) が PASS する"
+    type: dbt_test_passes
+    select: stg_orders
+    min_pass: 2
+    points: 25
+
+  - id: positive-value-tests-pass-on-stg-products
+    description: "stg_products に対する positive_value test (unit_price) が PASS する"
+    type: dbt_test_passes
+    select: stg_products
+    min_pass: 1
+    points: 25
+
+  # ----- ボーナス: 引数付き generic test (10点) -----
+
+  - id: in-range-test-file-exists
+    description: "(任意) dbt/tests/generic/test_in_range.sql が存在する (Step 5 ボーナス)"
+    type: file_exists
+    path: dbt/tests/generic/test_in_range.sql
+    points: 10
