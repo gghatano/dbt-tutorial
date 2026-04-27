@@ -1,0 +1,50 @@
+# Grading definition for Exercise 06 (exposures + dbt docs).
+# Run by: python scripts/grader/grade.py --exercise 06
+
+exercise: 06-exposures-and-docs
+title: "Exercise 06: BI を dbt の lineage に組み込む"
+passing_score: 80   # need >= 80% of total points to PASS
+
+# Files the learner is expected to create. Used by docs/UX only — the grader
+# does not enforce file existence here; checks below do that via manifest /
+# file_exists as appropriate.
+expects_learner_files:
+  - dbt/models/exposures/exposures.yml
+
+checks:
+  # ----- structural (manifest-only, no DB needed) -----
+
+  - id: parse-success
+    description: "dbt parse が成功する (構文 OK)"
+    type: dbt_command
+    command: ["dbt", "parse"]
+    points: 15
+
+  - id: exposure-file-exists
+    description: "dbt/models/exposures/exposures.yml が存在する"
+    type: file_exists
+    path: dbt/models/exposures/exposures.yml
+    points: 10
+
+  - id: exposure-declared
+    description: "manifest に exposure.local_analytics.sales_overview が登録されている"
+    type: manifest_node_exists
+    node: exposure.local_analytics.sales_overview
+    points: 20
+
+  - id: exposure-depends-on-3-marts
+    description: "exposure が 3 つの mart を depends_on として宣言している"
+    type: manifest_lineage
+    node: exposure.local_analytics.sales_overview
+    upstream_min_count: 3
+    upstream_must_include:
+      - model.local_analytics.mart_daily_sales
+      - model.local_analytics.mart_customer_sales
+      - model.local_analytics.mart_product_sales
+    points: 30
+
+  - id: docs-generate-success
+    description: "dbt docs generate が成功する (catalog.json + manifest.json)"
+    type: dbt_command
+    command: ["dbt", "docs", "generate"]
+    points: 25
