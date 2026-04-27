@@ -1,0 +1,69 @@
+# Grading definition for 100-knock Topic 6, Problem 6-3 (accepted_values for payment_method).
+# Run by: python scripts/grader/grade.py --exercise 100-knock-6-3-accepted-values
+#
+# 採点方針:
+#   - 構造チェック (parse / SQL に payment_method 派生 / YAML に accepted_values
+#     宣言 / manifest に test node 登録) で 60 点
+#   - データチェック (dbt_test_passes で accepted_values が PASS, sql_assert で
+#     payment_method が 3 値の何れかを取ること) で 40 点
+#   - 違反値の混入 / 復帰は学習体験 (採点しない)。本問は「宣言が書かれて、
+#     かつ PASS する」ことを厳密に見る。
+#
+# 前提:
+#   - Topic ② ③ ④ ⑤ 完了
+#   - 学習者は stg_orders_100knock.sql に payment_method 派生列を追加
+#     + schema.yml に accepted_values: ['card', 'cash', 'qr'] を宣言
+
+exercise: 100-knock-6-3-accepted-values
+title: "100-knock 6-3: payment_method に accepted_values で domain 契約"
+passing_score: 80
+
+expects_learner_files:
+  - dbt/models/100-knock/topic-3/stg_orders_100knock.sql
+  - dbt/models/100-knock/topic-3/schema.yml
+
+checks:
+  # ----- 構造チェック (60 点) -----
+
+  - id: parse-success
+    description: "dbt parse が成功する"
+    type: dbt_command
+    command: ["dbt", "parse"]
+    points: 10
+
+  - id: sql-has-payment-method
+    description: "stg_orders_100knock.sql に payment_method 派生列が追加されている (grep)"
+    type: shell_command
+    command: "grep -n 'payment_method' dbt/models/100-knock/topic-3/stg_orders_100knock.sql"
+    expect_stdout_match: "payment_method"
+    points: 15
+
+  - id: schema-yml-has-accepted-values
+    description: "schema.yml に accepted_values と 3 値 (card / cash / qr) が宣言されている (grep)"
+    type: shell_command
+    command: "grep -E 'accepted_values|card|cash|qr' dbt/models/100-knock/topic-3/schema.yml"
+    expect_stdout_match: "accepted_values"
+    points: 15
+
+  - id: accepted-values-test-registered
+    description: "manifest に accepted_values test (payment_method) が登録されている"
+    type: manifest_node_exists
+    node: test.local_analytics.accepted_values_stg_orders_100knock_payment_method__card__cash__qr
+    points: 20
+
+  # ----- データチェック (40 点) -----
+
+  - id: accepted-values-test-passes
+    description: "dbt test --select stg_orders_100knock で accepted_values が PASS (min_pass 1)"
+    type: dbt_test_passes
+    select: stg_orders_100knock
+    min_pass: 1
+    points: 25
+
+  - id: payment-method-domain-clean
+    description: "payment_method が card / cash / qr のいずれかしか取らない"
+    type: sql_assert
+    sql: "SELECT count(*) FROM staging.stg_orders_100knock WHERE payment_method NOT IN ('card', 'cash', 'qr') OR payment_method IS NULL"
+    op: eq
+    expected: 0
+    points: 15

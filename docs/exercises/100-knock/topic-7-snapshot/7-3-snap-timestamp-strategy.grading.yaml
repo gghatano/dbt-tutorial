@@ -1,0 +1,67 @@
+# Grading definition for 100-knock Topic 7, Problem 7-3 (timestamp strategy snapshot).
+# Run by: python scripts/grader/grade.py --grading-file docs/exercises/100-knock/topic-7-snapshot/7-3-snap-timestamp-strategy.grading.yaml
+#
+# 採点方針:
+#   - file_exists / parse / manifest_node / manifest_config で構造 65 点
+#   - shell_command で snapshot 実行 + sql_assert で行数 35 点
+#
+# 前提:
+#   - 7-1 完了 (snap_products_100knock の check 版が動く)
+#   - 学習者が raw.products に updated_at 列を追加し、sources.yml にも記載
+#   - 学習者が dbt/snapshots/100-knock/topic-7/snap_products_ts_100knock.sql を作成
+
+exercise: 100-knock-7-3-snap-timestamp-strategy
+title: "100-knock 7-3: timestamp strategy で別 snapshot を作る"
+passing_score: 80
+
+expects_learner_files:
+  - dbt/snapshots/100-knock/topic-7/snap_products_ts_100knock.sql
+
+checks:
+  # ----- 構造チェック (65 点) -----
+
+  - id: snap-ts-file-exists
+    description: "dbt/snapshots/100-knock/topic-7/snap_products_ts_100knock.sql が存在する"
+    type: file_exists
+    path: dbt/snapshots/100-knock/topic-7/snap_products_ts_100knock.sql
+    points: 10
+
+  - id: parse-success
+    description: "dbt parse が成功する (timestamp strategy の構文 OK)"
+    type: dbt_command
+    command: ["dbt", "parse"]
+    points: 10
+
+  - id: snap-ts-node-registered
+    description: "manifest に snapshot.local_analytics.snap_products_ts_100knock が登録されている"
+    type: manifest_node_exists
+    node: snapshot.local_analytics.snap_products_ts_100knock
+    points: 15
+
+  - id: snap-ts-config-timestamp
+    description: "snap_products_ts_100knock の config が strategy=timestamp / updated_at=updated_at / unique_key=product_id を持つ"
+    type: manifest_config
+    node: snapshot.local_analytics.snap_products_ts_100knock
+    expected:
+      strategy: timestamp
+      updated_at: updated_at
+      unique_key: product_id
+      target_schema: snapshots
+    points: 30
+
+  # ----- データチェック (35 点) -----
+
+  - id: snap-ts-run-success
+    description: "dbt snapshot --select snap_products_ts_100knock が成功する"
+    type: shell_command
+    command: ["bash", "-c", "cd dbt && ../.venv/bin/dbt snapshot --profiles-dir . --select snap_products_ts_100knock"]
+    expect_stdout_match: "PASS=1"
+    points: 20
+
+  - id: snap-ts-row-count-100
+    description: "snapshots.snap_products_ts_100knock が 100 行ある (1 回目 snapshot 後)"
+    type: sql_assert
+    sql: "SELECT count(*)::int FROM snapshots.snap_products_ts_100knock"
+    op: gte
+    expected: 100
+    points: 15

@@ -1,0 +1,57 @@
+# Grading definition for 100-knock Topic 7, Problem 7-5 (snapshot schema test).
+# Run by: python scripts/grader/grade.py --grading-file docs/exercises/100-knock/topic-7-snapshot/7-5-snap-schema-test.grading.yaml
+#
+# 採点方針:
+#   - file_exists で schema.yml 確認
+#   - parse 成功
+#   - schema.yml に snapshots: ブロックが含まれること (shell_command grep)
+#   - dbt_test_passes で snapshot の test 群が PASS=4 以上
+#
+# 前提:
+#   - 7-1 完了 (snap_products_100knock が動き、snapshots テーブルが存在)
+#   - 学習者が dbt/snapshots/100-knock/topic-7/schema.yml を作成
+
+exercise: 100-knock-7-5-snap-schema-test
+title: "100-knock 7-5: snapshot 自身に schema test を貼る"
+passing_score: 80
+
+expects_learner_files:
+  - dbt/snapshots/100-knock/topic-7/schema.yml
+
+checks:
+  # ----- 構造チェック (60 点) -----
+
+  - id: schema-yml-exists
+    description: "dbt/snapshots/100-knock/topic-7/schema.yml が存在する"
+    type: file_exists
+    path: dbt/snapshots/100-knock/topic-7/schema.yml
+    points: 15
+
+  - id: parse-success
+    description: "dbt parse が成功する (snapshots: ブロックの YAML / 構文 OK)"
+    type: dbt_command
+    command: ["dbt", "parse"]
+    points: 15
+
+  - id: schema-yml-has-snapshots-key
+    description: "schema.yml に snapshots: トップレベルキーがある (models: ではない)"
+    type: shell_command
+    command: ["bash", "-c", "grep -E '^snapshots:' dbt/snapshots/100-knock/topic-7/schema.yml"]
+    expect_stdout_match: "snapshots:"
+    points: 15
+
+  - id: schema-yml-has-dbt-scd-id-test
+    description: "schema.yml で dbt_scd_id 列に test (not_null / unique) を宣言している"
+    type: shell_command
+    command: ["bash", "-c", "grep -E 'dbt_scd_id' dbt/snapshots/100-knock/topic-7/schema.yml"]
+    expect_stdout_match: "dbt_scd_id"
+    points: 15
+
+  # ----- データチェック (40 点) -----
+
+  - id: snap-tests-pass
+    description: "dbt test --select snap_products_100knock が PASS (snapshot 用 test 群が緑)"
+    type: dbt_test_passes
+    select: snap_products_100knock
+    min_pass: 3
+    points: 40

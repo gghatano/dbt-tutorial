@@ -1,0 +1,63 @@
+# Grading definition for 100-knock Topic 6, Problem 6-1 (not_null + unique on order_id).
+# Run by: python scripts/grader/grade.py --exercise 100-knock-6-1-not-null-unique
+#
+# 採点方針:
+#   - 構造チェック (parse / manifest 上の test node 存在 / schema.yml grep) で 60 点
+#   - データチェック (dbt_test_passes で 2 件以上 PASS) で 40 点
+#   - 学習者は schema.yml を編集 (3-4 で既に書いていればそのまま PASS)
+#
+# 前提:
+#   - Topic ② ③ ④ ⑤ 完了 (stg_orders_100knock が物理化済み)
+#   - 学習者は dbt/models/100-knock/topic-3/schema.yml を編集 (or 確認)
+
+exercise: 100-knock-6-1-not-null-unique
+title: "100-knock 6-1: stg_orders_100knock.order_id に not_null + unique を宣言"
+passing_score: 80
+
+expects_learner_files:
+  - dbt/models/100-knock/topic-3/schema.yml
+
+checks:
+  # ----- 構造チェック (60 点) -----
+
+  - id: parse-success
+    description: "dbt parse が成功する (schema.yml の構文 OK)"
+    type: dbt_command
+    command: ["dbt", "parse"]
+    points: 10
+
+  - id: schema-yml-has-not-null-and-unique
+    description: "schema.yml に not_null と unique の両方が宣言されている (grep)"
+    type: shell_command
+    command: "grep -E 'not_null|unique' dbt/models/100-knock/topic-3/schema.yml | head -20"
+    expect_stdout_match: "(not_null|unique)"
+    points: 10
+
+  - id: not-null-test-registered
+    description: "manifest に not_null_stg_orders_100knock_order_id が登録されている"
+    type: manifest_node_exists
+    node: test.local_analytics.not_null_stg_orders_100knock_order_id
+    points: 20
+
+  - id: unique-test-registered
+    description: "manifest に unique_stg_orders_100knock_order_id が登録されている"
+    type: manifest_node_exists
+    node: test.local_analytics.unique_stg_orders_100knock_order_id
+    points: 20
+
+  # ----- データチェック (40 点) -----
+
+  - id: stg-orders-tests-pass
+    description: "dbt test --select stg_orders_100knock で 2 件以上 PASS (not_null + unique)"
+    type: dbt_test_passes
+    select: stg_orders_100knock
+    min_pass: 2
+    points: 25
+
+  - id: order-id-no-null-no-dup
+    description: "実データ上でも order_id に NULL も重複も無い"
+    type: sql_assert
+    sql: "SELECT count(*) - count(distinct order_id) + count(*) FILTER (WHERE order_id IS NULL) FROM staging.stg_orders_100knock"
+    op: eq
+    expected: 0
+    points: 15

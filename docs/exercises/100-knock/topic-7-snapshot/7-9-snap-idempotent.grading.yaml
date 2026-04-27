@@ -1,0 +1,58 @@
+# Grading for 100-knock Topic 7 / Q9: snapshot を 2 回叩いて no-op 確認 (冪等性)。
+# Run: python3 scripts/grader/grade.py --grading-file docs/exercises/100-knock/topic-7-snapshot/7-9-snap-idempotent.grading.yaml
+#
+# 前提: 7-1〜7-2 完了で snap_products_100knock が v1+v2 = 120 行 (v2 投入済み) の安定状態。
+# 採点が snapshot を 2 回叩いた前後で行数が動かないことを確認する。
+
+exercise: 100-knock-7-9-snap-idempotent
+title: "7-9: snapshot を 2 回叩いて no-op (冪等性)"
+passing_score: 80
+
+checks:
+  - id: row-count-baseline-120
+    description: "ベースライン: snap_products_100knock が 120 行 (v1 100 + v2 20) で始まる"
+    type: sql_assert
+    sql: "SELECT count(*)::int FROM snapshots.snap_products_100knock"
+    op: eq
+    expected: 120
+    points: 20
+
+  - id: snapshot-first-run-clean
+    description: "1 回目の dbt snapshot が exit 0 で完走"
+    type: shell_command
+    command: |
+      set -euo pipefail
+      cd dbt
+      ../.venv/bin/dbt snapshot --profiles-dir . \
+          --select snap_products_100knock --no-colors 2>&1 | tee /tmp/snap-7-9-run1.log >/dev/null
+      grep -qE 'Done\. PASS=1 .*ERROR=0' /tmp/snap-7-9-run1.log
+      echo "first snapshot run OK"
+    points: 20
+
+  - id: row-count-still-120-after-first-snapshot
+    description: "1 回目実行後も行数 120 (新規 INSERT 0 = no-op)"
+    type: sql_assert
+    sql: "SELECT count(*)::int FROM snapshots.snap_products_100knock"
+    op: eq
+    expected: 120
+    points: 15
+
+  - id: snapshot-second-run-clean
+    description: "2 回目の dbt snapshot も exit 0 で完走"
+    type: shell_command
+    command: |
+      set -euo pipefail
+      cd dbt
+      ../.venv/bin/dbt snapshot --profiles-dir . \
+          --select snap_products_100knock --no-colors 2>&1 | tee /tmp/snap-7-9-run2.log >/dev/null
+      grep -qE 'Done\. PASS=1 .*ERROR=0' /tmp/snap-7-9-run2.log
+      echo "second snapshot run OK"
+    points: 20
+
+  - id: row-count-still-120-after-second-snapshot
+    description: "2 回目実行後も行数 120 (= 1 回目と同じ = 冪等性 OK)"
+    type: sql_assert
+    sql: "SELECT count(*)::int FROM snapshots.snap_products_100knock"
+    op: eq
+    expected: 120
+    points: 25

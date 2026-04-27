@@ -1,0 +1,74 @@
+# Grading definition for 100-knock Topic 7, Problem 7-4 (hard_deletes new_record).
+# Run by: python scripts/grader/grade.py --grading-file docs/exercises/100-knock/topic-7-snapshot/7-4-snap-hard-deletes.grading.yaml
+#
+# 採点方針:
+#   - file_exists / parse / hard_deletes 文字列含有 / shell_command で snapshot 実行
+#   - sql_assert で削除イベント行 (dbt_is_deleted=true) が 5 行あること (加点)
+#
+# 前提:
+#   - 7-1〜7-2 完了
+#   - dbt-core 1.9+ (本リポジトリ 1.11 想定)
+#   - 学習者が dbt/snapshots/100-knock/topic-7/snap_products_hd_100knock.sql を作成
+#   - 採点時に CI 側で 1 回目 snapshot → DELETE 5 行 → 2 回目 snapshot を流すか、
+#     学習者が事前に流して現状で grader を回す
+#
+# 注意:
+#   - dbt-core 1.9 未満 / hard_deletes 未対応の場合は最後の sql_assert が 0 点になる
+#     可能性があるが、shell_command の grep で snapshot ファイルに hard_deletes の記述が
+#     あるかは検証する (構造点)。
+
+exercise: 100-knock-7-4-snap-hard-deletes
+title: "100-knock 7-4: hard_deletes で物理削除も履歴に残す"
+passing_score: 80
+
+expects_learner_files:
+  - dbt/snapshots/100-knock/topic-7/snap_products_hd_100knock.sql
+
+checks:
+  # ----- 構造チェック (50 点) -----
+
+  - id: snap-hd-file-exists
+    description: "dbt/snapshots/100-knock/topic-7/snap_products_hd_100knock.sql が存在する"
+    type: file_exists
+    path: dbt/snapshots/100-knock/topic-7/snap_products_hd_100knock.sql
+    points: 15
+
+  - id: parse-success
+    description: "dbt parse が成功する (hard_deletes 含む snapshot config の構文 OK)"
+    type: dbt_command
+    command: ["dbt", "parse"]
+    points: 10
+
+  - id: snap-hd-has-hard-deletes
+    description: "snapshot ファイルに hard_deletes の記述がある (new_record 設定)"
+    type: shell_command
+    command: ["bash", "-c", "grep -E \"hard_deletes\\s*=\\s*['\\\"]new_record['\\\"]\" dbt/snapshots/100-knock/topic-7/snap_products_hd_100knock.sql"]
+    expect_stdout_match: "hard_deletes"
+    points: 25
+
+  # ----- 実行チェック (35 点) -----
+
+  - id: snap-hd-run-success
+    description: "dbt snapshot --select snap_products_hd_100knock が成功する (削除前 or 後)"
+    type: shell_command
+    command: ["bash", "-c", "cd dbt && ../.venv/bin/dbt snapshot --profiles-dir . --select snap_products_hd_100knock"]
+    expect_stdout_match: "PASS=1"
+    points: 20
+
+  - id: snap-hd-row-count
+    description: "snapshots.snap_products_hd_100knock が 95 行以上ある (1 回目以降の最低保証)"
+    type: sql_assert
+    sql: "SELECT count(*)::int FROM snapshots.snap_products_hd_100knock"
+    op: gte
+    expected: 95
+    points: 15
+
+  # ----- データチェック (15 点, 加点) -----
+
+  - id: snap-hd-deleted-events
+    description: "削除イベント行 (dbt_is_deleted=true) が 5 行ある (削除実施・hard_deletes 動作確認)"
+    type: sql_assert
+    sql: "SELECT coalesce(count(*) FILTER (WHERE dbt_is_deleted = true), 0)::int FROM snapshots.snap_products_hd_100knock"
+    op: gte
+    expected: 5
+    points: 15
