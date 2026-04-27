@@ -1,0 +1,66 @@
+# Grading for 100-knock Topic 2 / Q8: dbt ls source selectors.
+# Run: python3 scripts/grader/grade.py --grading-file docs/exercises/100-knock/topic-2-raw-load/2-8-source-selectors.grading.yaml
+
+exercise: 100-knock-2-8-source-selectors
+title: "2-8: dbt ls --select source:raw.* / source:raw.customers+ で DAG を列挙"
+passing_score: 80
+
+expects_learner_files:
+  - dbt/output_lineage.txt
+
+checks:
+  - id: lineage-output-exists
+    description: "dbt/output_lineage.txt が存在する (学習者が dbt ls 結果を保存した)"
+    type: file_exists
+    path: dbt/output_lineage.txt
+    min_size_bytes: 50
+    points: 15
+
+  - id: lineage-output-has-4-sources
+    description: "output_lineage.txt に 4 つの source (customers/products/stores/orders) が書かれている"
+    type: shell_command
+    command: |
+      set -euo pipefail
+      n=0
+      for t in customers products stores orders; do
+        if grep -E "raw\.${t}\b" dbt/output_lineage.txt > /dev/null; then
+          n=$((n + 1))
+        fi
+      done
+      echo "sources_found=${n}"
+      test "${n}" -ge 4
+    points: 25
+
+  - id: lineage-output-min-4-lines
+    description: "output_lineage.txt に少なくとも 4 行ある (= 4 source 以上の列挙)"
+    type: shell_command
+    command: |
+      set -euo pipefail
+      n=$(grep -cE "." dbt/output_lineage.txt)
+      echo "non_blank_lines=${n}"
+      test "${n}" -ge 4
+    points: 15
+
+  - id: dbt-ls-source-wildcard-runs
+    description: "dbt ls --select source:raw.* を再実行しても exit 0 で 4 行以上返る"
+    type: shell_command
+    command: |
+      set -euo pipefail
+      cd dbt
+      out=$(../.venv/bin/dbt ls --profiles-dir . --select 'source:raw.*' --resource-type source 2>/dev/null || dbt ls --profiles-dir . --select 'source:raw.*' --resource-type source)
+      echo "$out"
+      n=$(echo "$out" | grep -cE "source:.+\.raw\.")
+      echo "matched=${n}"
+      test "${n}" -ge 4
+    points: 25
+
+  - id: dbt-ls-source-plus-operator-works
+    description: "dbt ls --select source:raw.customers+ が exit 0 で何らかの結果を返す"
+    type: shell_command
+    command: |
+      set -euo pipefail
+      cd dbt
+      out=$(../.venv/bin/dbt ls --profiles-dir . --select 'source:raw.customers+' 2>/dev/null || dbt ls --profiles-dir . --select 'source:raw.customers+')
+      echo "$out"
+      echo "$out" | grep -E "raw\.customers" > /dev/null
+    points: 20

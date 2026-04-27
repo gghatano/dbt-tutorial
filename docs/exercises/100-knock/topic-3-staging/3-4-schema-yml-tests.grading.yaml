@@ -1,0 +1,68 @@
+# Grading definition for 100-knock Topic 3, Problem 3-4 (schema.yml: not_null/unique/relationships).
+# Run by: python scripts/grader/grade.py --grading-file docs/exercises/100-knock/topic-3-staging/3-4-schema-yml-tests.grading.yaml
+#
+# 採点方針:
+#   - 構造チェック (file_exists / parse / manifest 上の test 存在) で 50 点
+#   - データチェック (dbt_test_passes で実 SQL 検査) で 50 点
+#   - relationships を実装したかどうかは min_pass で間接的に確認 (PK 系 + FK 系 の両方が PASS する必要)
+#
+# 前提:
+#   - 3-1 / 3-2 / 3-3 完了 (3 staging model 物理化済み)
+#   - 学習者は dbt/models/100-knock/topic-3/schema.yml を完成形に仕上げている
+
+exercise: 100-knock-3-4-schema-yml-tests
+title: "100-knock 3-4: schema.yml に not_null / unique / relationships を書き切る"
+passing_score: 80
+
+expects_learner_files:
+  - dbt/models/100-knock/topic-3/schema.yml
+
+checks:
+  # ----- 構造チェック (50 点) -----
+
+  - id: schema-yml-exists
+    description: "dbt/models/100-knock/topic-3/schema.yml が存在する"
+    type: file_exists
+    path: dbt/models/100-knock/topic-3/schema.yml
+    points: 10
+
+  - id: parse-success
+    description: "dbt parse が成功する (schema.yml の構文が正しい)"
+    type: dbt_command
+    command: ["dbt", "parse"]
+    points: 15
+
+  - id: stg-customers-test-registered
+    description: "manifest に stg_customers_100knock の unique test が登録されている (PK 制約)"
+    type: manifest_node_exists
+    node: test.local_analytics.unique_stg_customers_100knock_customer_id
+    points: 10
+
+  - id: stg-orders-test-registered
+    description: "manifest に stg_orders_100knock の unique test が登録されている (PK 制約)"
+    type: manifest_node_exists
+    node: test.local_analytics.unique_stg_orders_100knock_order_id
+    points: 15
+
+  # ----- データチェック (50 点) -----
+
+  - id: stg-customers-tests-pass
+    description: "stg_customers_100knock の test が全件 PASS (not_null + unique など)"
+    type: dbt_test_passes
+    select: stg_customers_100knock
+    min_pass: 2
+    points: 10
+
+  - id: stg-products-tests-pass
+    description: "stg_products_100knock の test が全件 PASS"
+    type: dbt_test_passes
+    select: stg_products_100knock
+    min_pass: 2
+    points: 10
+
+  - id: stg-orders-tests-pass-with-relationships
+    description: "stg_orders_100knock の test が PASS (PK + FK の relationships を含む 6 件以上)"
+    type: dbt_test_passes
+    select: stg_orders_100knock
+    min_pass: 6
+    points: 30

@@ -1,0 +1,64 @@
+# Grading for 100-knock Topic 3 / Q7: 命名規約 README + dbt parse の CI 組み込み。
+# Run: python3 scripts/grader/grade.py --grading-file docs/exercises/100-knock/topic-3-staging/3-7-naming-convention.grading.yaml
+
+exercise: 100-knock-3-7-naming-convention
+title: "3-7: stg_* の命名規約 (snake_case / _id / 単複) を README 化"
+passing_score: 80
+
+expects_learner_files:
+  - docs/exercises/100-knock/topic-3-staging/naming-convention.md
+
+checks:
+  - id: naming-convention-md-exists
+    description: "学習者が naming-convention.md を作成した"
+    type: file_exists
+    path: docs/exercises/100-knock/topic-3-staging/naming-convention.md
+    min_size_bytes: 500
+    points: 15
+
+  - id: snake-case-mentioned
+    description: "ドキュメントに snake_case の言及がある"
+    type: shell_command
+    command: |
+      set -euo pipefail
+      n=$(grep -c 'snake_case' docs/exercises/100-knock/topic-3-staging/naming-convention.md || echo 0)
+      echo "snake_case_mentions=${n}"
+      test "${n}" -ge 1
+    points: 15
+
+  - id: id-suffix-mentioned
+    description: "ドキュメントに `_id` suffix の言及がある"
+    type: shell_command
+    command: |
+      set -euo pipefail
+      n=$(grep -c '_id' docs/exercises/100-knock/topic-3-staging/naming-convention.md || echo 0)
+      echo "_id_mentions=${n}"
+      test "${n}" -ge 2
+    points: 15
+
+  - id: plural-singular-mentioned
+    description: "ドキュメントに plural/複数 と singular/単数 両方の言及がある"
+    type: shell_command
+    command: |
+      set -euo pipefail
+      plural=$(grep -cE 'plural|複数' docs/exercises/100-knock/topic-3-staging/naming-convention.md || echo 0)
+      singular=$(grep -cE 'singular|単数' docs/exercises/100-knock/topic-3-staging/naming-convention.md || echo 0)
+      echo "plural_mentions=${plural} singular_mentions=${singular}"
+      test "${plural}" -ge 1 && test "${singular}" -ge 1
+    points: 20
+
+  - id: why-rationale-included
+    description: "ドキュメントに「なぜ?」または「why」の理由セクションがある"
+    type: shell_command
+    command: |
+      set -euo pipefail
+      n=$(grep -ciE 'なぜ|why|理由' docs/exercises/100-knock/topic-3-staging/naming-convention.md || echo 0)
+      echo "rationale_mentions=${n}"
+      test "${n}" -ge 1
+    points: 15
+
+  - id: dbt-parse-success
+    description: "dbt parse が成功する (schema.yml と SQL ファイルが整合している)"
+    type: dbt_command
+    command: ["parse"]
+    points: 20

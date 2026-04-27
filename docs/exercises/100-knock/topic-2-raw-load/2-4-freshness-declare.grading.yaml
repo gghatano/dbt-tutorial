@@ -1,0 +1,55 @@
+# Grading for 100-knock Topic 2 / Q4: declare freshness SLA on raw.orders.
+# Run: python3 scripts/grader/grade.py --grading-file docs/exercises/100-knock/topic-2-raw-load/2-4-freshness-declare.grading.yaml
+
+exercise: 100-knock-2-4-freshness-declare
+title: "2-4: raw.orders に loaded_at を持たせ、freshness SLA を宣言する"
+passing_score: 80
+
+expects_learner_files:
+  - dbt/models/100-knock/topic-2/sources.yml
+  - scripts/100-knock/topic-2/load_raw.py
+
+checks:
+  - id: sources-yml-has-freshness
+    description: "sources.yml に freshness: キーが含まれている"
+    type: shell_command
+    command: "grep -q 'freshness:' dbt/models/100-knock/topic-2/sources.yml"
+    points: 15
+
+  - id: sources-yml-has-loaded-at-field
+    description: "sources.yml に loaded_at_field: キーが含まれている"
+    type: shell_command
+    command: "grep -q 'loaded_at_field:' dbt/models/100-knock/topic-2/sources.yml"
+    points: 15
+
+  - id: sources-yml-has-warn-after
+    description: "sources.yml に warn_after: キーが含まれている"
+    type: shell_command
+    command: "grep -q 'warn_after:' dbt/models/100-knock/topic-2/sources.yml"
+    points: 10
+
+  - id: sources-yml-has-error-after
+    description: "sources.yml に error_after: キーが含まれている"
+    type: shell_command
+    command: "grep -q 'error_after:' dbt/models/100-knock/topic-2/sources.yml"
+    points: 10
+
+  - id: load-raw-rerun
+    description: "改修版 load_raw.py が exit 0 で再ロードできる (loaded_at 列を含む)"
+    type: shell_command
+    command: ["python3", "scripts/100-knock/topic-2/load_raw.py"]
+    points: 15
+
+  - id: orders-loaded-at-not-null
+    description: "raw.orders.loaded_at に NULL が無い (DEFAULT now() で全行埋まる)"
+    type: sql_assert
+    sql: "SELECT count(*) FROM raw.orders WHERE loaded_at IS NULL"
+    op: eq
+    expected: 0
+    points: 15
+
+  - id: dbt-source-freshness-passes
+    description: "dbt source freshness --select source:raw_100knock.orders が exit 0 (PASS)"
+    type: dbt_command
+    command: ["dbt", "source", "freshness", "--select", "source:raw_100knock.orders"]
+    points: 20

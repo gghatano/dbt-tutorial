@@ -1,0 +1,46 @@
+# Grading for 100-knock Topic 2 / Q2: declare raw_100knock source in sources.yml.
+# Run: python3 scripts/grader/grade.py --grading-file docs/exercises/100-knock/topic-2-raw-load/2-2-sources-yml.grading.yaml
+
+exercise: 100-knock-2-2-sources-yml
+title: "2-2: sources.yml で raw 4 テーブルに dbt 上の論理名を貼る"
+passing_score: 80
+
+expects_learner_files:
+  - dbt/models/100-knock/topic-2/sources.yml
+
+checks:
+  - id: sources-yml-exists
+    description: "dbt/models/100-knock/topic-2/sources.yml が存在する"
+    type: file_exists
+    path: dbt/models/100-knock/topic-2/sources.yml
+    points: 10
+
+  - id: dbt-parse-success
+    description: "dbt parse が成功する (sources.yml の構文 OK)"
+    type: dbt_command
+    command: ["dbt", "parse"]
+    points: 20
+
+  - id: source-customers-registered
+    description: "manifest に source raw_100knock.customers が登録されている"
+    type: manifest_node_exists
+    node: source.local_analytics.raw_100knock.customers
+    points: 20
+
+  - id: source-products-registered
+    description: "manifest に source raw_100knock.products が登録されている"
+    type: manifest_node_exists
+    node: source.local_analytics.raw_100knock.products
+    points: 15
+
+  - id: source-stores-registered
+    description: "manifest に source raw_100knock.stores が登録されている"
+    type: manifest_node_exists
+    node: source.local_analytics.raw_100knock.stores
+    points: 15
+
+  - id: source-orders-registered
+    description: "manifest に source raw_100knock.orders が登録されている"
+    type: manifest_node_exists
+    node: source.local_analytics.raw_100knock.orders
+    points: 20
