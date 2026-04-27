@@ -1,0 +1,88 @@
+# Grading for 100-knock Topic 8 / Q10: packages.yml の pin と package-lock.yml の役割言語化
+# Run: python3 scripts/grader/grade.py --grading-file docs/exercises/100-knock/topic-8-reuse/8-10-package-lock.grading.yaml
+#
+# 採点方針:
+#   - 構造チェック (packages.yml の pin 形式 + lock 存在 + notes 存在)   55
+#   - 言語化チェック (notes に必須キーワードを含む)                     30
+#   - 動作チェック (dbt parse が pin 後も成功)                          15
+#   合計 100、合格 80
+#
+# 前提:
+#   - Topic ② 〜 ⑦ + Topic ⑧ 8-1〜8-9 完了
+#   - dbt/packages.yml に dbt-utils + dbt-expectations が登録されている
+#   - dbt 1.7+ (= package-lock.yml 自動生成)
+
+exercise: 100-knock-8-10-package-lock
+title: "8-10: packages.yml を pin、package-lock.yml の差分と役割を 3 行で言語化"
+passing_score: 80
+
+expects_learner_files:
+  - dbt/packages.yml
+  - dbt/package-lock.yml
+  - docs/exercises/100-knock/topic-8-reuse/package-lock-notes.md
+
+checks:
+  # ----- 構造チェック (55点) -----
+
+  - id: packages-yml-pinned
+    description: "dbt/packages.yml の version が単一バージョン pin 形式 (= 範囲指定 [], >=, < が使われていない) 行が 2 つ以上"
+    type: shell_command
+    command: |
+      set -euo pipefail
+      pinned=$(grep -cE "^\s+version:\s+[\"']?[0-9]+\.[0-9]+\.[0-9]+[\"']?\s*$" dbt/packages.yml || echo 0)
+      ranged=$(grep -cE "^\s+version:\s+\[" dbt/packages.yml || echo 0)
+      echo "pinned_lines=${pinned} ranged_lines=${ranged}"
+      test "${pinned}" -ge 2
+      test "${ranged}" -eq 0
+    points: 25
+
+  - id: package-lock-yml-exists
+    description: "dbt/package-lock.yml が存在する (= dbt deps が走り lockfile が生成されている)"
+    type: file_exists
+    path: dbt/package-lock.yml
+    min_size_bytes: 50
+    points: 15
+
+  - id: package-lock-notes-exists
+    description: "docs/exercises/100-knock/topic-8-reuse/package-lock-notes.md が存在する"
+    type: file_exists
+    path: docs/exercises/100-knock/topic-8-reuse/package-lock-notes.md
+    min_size_bytes: 100
+    points: 15
+
+  # ----- 言語化チェック (30点) -----
+
+  - id: notes-keywords-reproducibility
+    description: "notes 本文に '再現可能性' (または reproducibility) のキーワードが含まれる"
+    type: shell_command
+    command: |
+      set -euo pipefail
+      f=docs/exercises/100-knock/topic-8-reuse/package-lock-notes.md
+      n=$(grep -ciE '再現可能性|reproducibility|再現' "$f" || echo 0)
+      echo "reproducibility_hits=${n}"
+      test "${n}" -ge 1
+    points: 15
+
+  - id: notes-keywords-auto-update
+    description: "notes 本文に '自動更新' (または auto update / upgrade) のキーワードが含まれる"
+    type: shell_command
+    command: |
+      set -euo pipefail
+      f=docs/exercises/100-knock/topic-8-reuse/package-lock-notes.md
+      n=$(grep -ciE '自動更新|auto.?update|auto.?upgrade|--upgrade' "$f" || echo 0)
+      echo "auto_update_hits=${n}"
+      test "${n}" -ge 1
+    points: 15
+
+  # ----- 動作チェック (15点) -----
+
+  - id: dbt-parse-after-pin
+    description: "pin 後も dbt parse が成功する (= pin した version で dbt deps が解決可能)"
+    type: shell_command
+    command: |
+      set -euo pipefail
+      cd dbt
+      dbt deps --profiles-dir . 2>&1 | tee /tmp/8-10-deps.log
+      dbt parse --profiles-dir . 2>&1 | tee /tmp/8-10-parse.log
+      ! grep -E 'ERROR|Error|Compilation Error' /tmp/8-10-parse.log >/dev/null
+    points: 15

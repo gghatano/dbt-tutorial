@@ -1,0 +1,100 @@
+# Grading definition for 100-knock Topic 8, Problem 8-5 (Jinja for loop で audit 列を一括追加).
+# Run by: python scripts/grader/grade.py --grading-file docs/exercises/100-knock/topic-8-reuse/8-5-jinja-loop-audit-cols.grading.yaml
+#
+# 採点方針:
+#   - 構造チェック (file_exists / parse / shell grep / manifest_config) で 50 点
+#   - 実行チェック (dbt run + sql_assert で 4 staging に last_updated_at 列が存在) で 50 点
+#
+# 前提:
+#   - Topic ② 〜 ⑦ 完了 (4 staging が物理化済み)
+#   - 学習者が macro + 4 staging の config 改修を完了
+
+exercise: 100-knock-8-5-jinja-loop-audit-cols
+title: "100-knock 8-5: Jinja {% for %} loop で 4 staging に last_updated_at 列を一括追加 (pre_hook)"
+passing_score: 80
+
+expects_learner_files:
+  - dbt/macros/100-knock/topic-8/add_audit_columns.sql
+  - dbt/models/100-knock/topic-3/stg_orders_100knock.sql
+  - dbt/models/100-knock/topic-3/stg_customers_100knock.sql
+  - dbt/models/100-knock/topic-3/stg_products_100knock.sql
+  - dbt/models/100-knock/topic-3/stg_stores_100knock.sql
+
+checks:
+  # ----- 構造チェック (50 点) -----
+
+  - id: macro-file-exists
+    description: "dbt/macros/100-knock/topic-8/add_audit_columns.sql が存在し、{% for %} loop を含む"
+    type: file_exists
+    path: dbt/macros/100-knock/topic-8/add_audit_columns.sql
+    min_size_bytes: 200
+    points: 10
+
+  - id: macro-uses-for-loop
+    description: "macro 内で {% for ... in ... %} ... {% endfor %} を使っている"
+    type: shell_command
+    command: |
+      set -euo pipefail
+      grep -E '\{%-?\s*for\s+' dbt/macros/100-knock/topic-8/add_audit_columns.sql >/dev/null
+      grep -E '\{%-?\s*endfor' dbt/macros/100-knock/topic-8/add_audit_columns.sql >/dev/null
+      echo "for_loop_present"
+    points: 10
+
+  - id: parse-success
+    description: "dbt parse が成功する (macro + pre_hook 構文 OK)"
+    type: dbt_command
+    command: ["parse"]
+    points: 10
+
+  - id: stg-orders-pre-hook-configured
+    description: "stg_orders_100knock の manifest config に pre_hook が設定されている"
+    type: manifest_config
+    node: model.local_analytics.stg_orders_100knock
+    expected:
+      pre_hook: ["{{ add_audit_columns() }}"]
+    points: 10
+
+  - id: stg-customers-pre-hook-configured
+    description: "stg_customers_100knock の manifest config に pre_hook が設定されている"
+    type: manifest_config
+    node: model.local_analytics.stg_customers_100knock
+    expected:
+      pre_hook: ["{{ add_audit_columns() }}"]
+    points: 10
+
+  # ----- 実行チェック (50 点) -----
+
+  - id: dbt-run-4-stagings
+    description: "dbt run --select <4 stagings> が PASS=4 で成功 (pre_hook 実行込み)"
+    type: dbt_command
+    command:
+      - "run"
+      - "--select"
+      - "stg_orders_100knock"
+      - "stg_customers_100knock"
+      - "stg_products_100knock"
+      - "stg_stores_100knock"
+    points: 15
+
+  - id: last-updated-at-column-on-4-stagings
+    description: "4 staging テーブル全てに last_updated_at 列 (timestamptz) が存在"
+    type: sql_assert
+    sql: |
+      SELECT count(DISTINCT table_name)::int FROM information_schema.columns
+       WHERE table_schema='staging'
+         AND table_name IN (
+              'stg_orders_100knock','stg_customers_100knock',
+              'stg_products_100knock','stg_stores_100knock')
+         AND column_name='last_updated_at'
+         AND data_type='timestamp with time zone'
+    op: eq
+    expected: 4
+    points: 25
+
+  - id: last-updated-at-not-null
+    description: "stg_orders_100knock.last_updated_at に NULL 行が無い (UPDATE が効いた証拠)"
+    type: sql_assert
+    sql: "SELECT count(*)::int FROM staging.stg_orders_100knock WHERE last_updated_at IS NULL"
+    op: eq
+    expected: 0
+    points: 10

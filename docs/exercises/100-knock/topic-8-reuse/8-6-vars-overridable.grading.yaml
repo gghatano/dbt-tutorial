@@ -1,0 +1,79 @@
+# Grading for 100-knock Topic 8 / Q6: vars でビジネスパラメータをコードから分離 + --vars で上書き
+# Run: python3 scripts/grader/grade.py --grading-file docs/exercises/100-knock/topic-8-reuse/8-6-vars-overridable.grading.yaml
+#
+# 採点方針:
+#   - 構造チェック (dbt_project.yml に vars + model に var() 呼び出し)        40
+#   - 動作チェック (default run 成功 + --vars 上書きで行数差)                60
+#   合計 100、合格 80
+#
+# 前提:
+#   - Topic ② ③ ④ + Topic ⑧ 8-1〜8-5 完了
+#   - dbt/models/100-knock/topic-4/int_order_details_100knock.sql が存在し、
+#     sales_amount 列を持っている (= 4-1 で作った中間モデル)
+
+exercise: 100-knock-8-6-vars-overridable
+title: "8-6: vars でビジネスパラメータを宣言、CLI --vars で上書きできる状態を作る"
+passing_score: 80
+
+expects_learner_files:
+  - dbt/dbt_project.yml
+  - dbt/models/100-knock/topic-4/int_order_details_100knock.sql
+
+checks:
+  # ----- 構造チェック (40点) -----
+
+  - id: vars-block-in-project-yml
+    description: "dbt/dbt_project.yml のトップレベルに vars: ブロック + min_order_amount: 100 が宣言されている"
+    type: shell_command
+    command: |
+      set -euo pipefail
+      vars_lines=$(grep -cE '^vars:' dbt/dbt_project.yml || echo 0)
+      min_lines=$(grep -cE '^\s*min_order_amount:\s*100\b' dbt/dbt_project.yml || echo 0)
+      echo "vars_lines=${vars_lines} min_order_amount_lines=${min_lines}"
+      test "${vars_lines}" -ge 1
+      test "${min_lines}" -ge 1
+    points: 20
+
+  - id: var-call-in-int-model
+    description: "int_order_details_100knock.sql に var('min_order_amount') 呼び出しが含まれる"
+    type: shell_command
+    command: |
+      set -euo pipefail
+      f=dbt/models/100-knock/topic-4/int_order_details_100knock.sql
+      n=$(grep -cE "var\(['\"]min_order_amount['\"]" "$f" || echo 0)
+      echo "var_call_lines=${n}"
+      test "${n}" -ge 1
+    points: 20
+
+  # ----- 動作チェック (60点) -----
+
+  - id: dbt-run-default-success
+    description: "dbt run --select int_order_details_100knock (= 既定 vars) が成功する"
+    type: shell_command
+    command: |
+      set -euo pipefail
+      cd dbt
+      dbt run --select int_order_details_100knock --profiles-dir . 2>&1 | tee /tmp/8-6-default.log
+      grep -E 'ERROR=0' /tmp/8-6-default.log >/dev/null
+      ! grep -E 'ERROR=[1-9]' /tmp/8-6-default.log >/dev/null
+    points: 15
+
+  - id: dbt-run-vars-override-zero
+    description: "dbt run --vars '{min_order_amount: 0}' が成功する (= CLI 上書き経路)"
+    type: shell_command
+    command: |
+      set -euo pipefail
+      cd dbt
+      dbt run --select int_order_details_100knock \
+        --vars '{min_order_amount: 0}' --profiles-dir . 2>&1 | tee /tmp/8-6-override.log
+      grep -E 'ERROR=0' /tmp/8-6-override.log >/dev/null
+      ! grep -E 'ERROR=[1-9]' /tmp/8-6-override.log >/dev/null
+    points: 25
+
+  - id: filter-applied-when-default
+    description: "既定 vars (=100) で run した直後の行数が、min(sales_amount)=10 等を含む全件より少ない (= where が効いている)"
+    type: sql_assert
+    sql: "SELECT (SELECT count(*) FROM intermediate.int_order_details_100knock WHERE sales_amount < 100)::int"
+    op: eq
+    expected: 0
+    points: 20

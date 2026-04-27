@@ -1,0 +1,89 @@
+# Grading for 100-knock Topic 9 / Q9: dbt build で test 失敗 → 下流 SKIP の依存ガード。
+# Run: python3 scripts/grader/grade.py --grading-file docs/exercises/100-knock/topic-9-performance/9-9-dbt-build-skip.grading.yaml
+#
+# 注意:
+# - 学習者は本問完了後、壊した test を元に戻すこと (Step 5)。
+# - 採点では grader が一時的に壊す singular test を作って dbt build を実行 → SKIP/ERROR ログを観察。
+# - 採点後は grader が必ず一時 test を削除する (trap で確実に)。
+
+exercise: 100-knock-9-9-dbt-build-skip
+title: "9-9: dbt build --select +mart_customer_sales_100knock で test 失敗 → 下流 SKIP の依存ガード"
+passing_score: 80
+
+expects_learner_files:
+  - docs/exercises/100-knock/topic-9-performance/build-skip.md
+
+checks:
+  - id: build-skip-md-exists
+    description: "build-skip.md が存在する (300 bytes 以上)"
+    type: file_exists
+    path: docs/exercises/100-knock/topic-9-performance/build-skip.md
+    min_size_bytes: 300
+    points: 15
+
+  - id: doc-mentions-skip-keyword
+    description: "build-skip.md に「SKIP」キーワードが含まれる"
+    type: shell_command
+    command: |
+      set -euo pipefail
+      doc=docs/exercises/100-knock/topic-9-performance/build-skip.md
+      n=$(grep -cE 'SKIP|skip' "$doc" || echo 0)
+      echo "skip_mentions=${n}"
+      test "${n}" -ge 1
+    points: 15
+
+  - id: doc-mentions-error-keyword
+    description: "build-skip.md に「ERROR」または「FAIL」キーワードが含まれる"
+    type: shell_command
+    command: |
+      set -euo pipefail
+      doc=docs/exercises/100-knock/topic-9-performance/build-skip.md
+      n=$(grep -cE 'ERROR|FAIL|fail' "$doc" || echo 0)
+      echo "error_mentions=${n}"
+      test "${n}" -ge 1
+    points: 15
+
+  - id: doc-mentions-mart-customer-sales
+    description: "build-skip.md に mart_customer_sales_100knock の言及がある (= 下流 SKIP の対象)"
+    type: shell_command
+    command: |
+      set -euo pipefail
+      doc=docs/exercises/100-knock/topic-9-performance/build-skip.md
+      n=$(grep -cE 'mart_customer_sales_100knock' "$doc" || echo 0)
+      echo "mart_mentions=${n}"
+      test "${n}" -ge 1
+    points: 15
+
+  - id: dbt-build-with-injected-failing-test-shows-skip
+    description: "壊した test を一時的に注入して dbt build を実行 → ログに SKIP と ERROR が両方出る"
+    type: shell_command
+    command: |
+      set -euo pipefail
+      mkdir -p dbt/tests/100-knock/topic-9
+      cat > dbt/tests/100-knock/topic-9/_grader_inject_failing_test.sql <<'SQL'
+      {{ config(severity='error') }}
+      select * from {{ ref('stg_orders_100knock') }}
+      where quantity <= 9999
+      SQL
+      trap 'rm -f dbt/tests/100-knock/topic-9/_grader_inject_failing_test.sql' EXIT
+
+      cd dbt
+      ../.venv/bin/dbt build --select +mart_customer_sales_100knock --profiles-dir . --no-colors 2>&1 | tee /tmp/9-9-grader-skip.log || true
+      grep -qE 'SKIP' /tmp/9-9-grader-skip.log
+      grep -qE 'ERROR=[1-9]|FAIL' /tmp/9-9-grader-skip.log
+      echo "SKIP and ERROR both present"
+    points: 25
+
+  - id: dbt-build-baseline-passes-after-cleanup
+    description: "壊した test を削除した状態で baseline build が PASS する (= 学習者が後始末している前提)"
+    type: shell_command
+    command: |
+      set -euo pipefail
+      # 学習者が掃除しているはず。grader はあくまで保険として掃除コマンド実行
+      rm -f dbt/tests/100-knock/topic-9/_grader_inject_failing_test.sql
+      rm -f dbt/tests/100-knock/topic-9/assert_quantity_too_large.sql
+      cd dbt
+      ../.venv/bin/dbt build --select +mart_customer_sales_100knock --profiles-dir . --no-colors 2>&1 | tee /tmp/9-9-grader-baseline.log
+      grep -qE 'Done\.' /tmp/9-9-grader-baseline.log
+      ! grep -qE 'ERROR=[1-9]' /tmp/9-9-grader-baseline.log
+    points: 15
