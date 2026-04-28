@@ -44,6 +44,9 @@ cp .env.example .env
 .venv/bin/python scripts/load_raw_data.py
 
 # 6. dbt 実行（環境変数を流し込んでから dbt/ で実行）
+# 既存 shell に DB_USER/DB_PASSWORD/METABASE_* を export 済みだと .env が効かないので、
+# 新しい shell を開くか、念のため unset してから source する。
+unset DB_USER DB_PASSWORD METABASE_DB_RO_PASSWORD METABASE_ADMIN_PASSWORD 2>/dev/null
 set -a; source .env; set +a
 cd dbt && ../.venv/bin/dbt run --profiles-dir . && ../.venv/bin/dbt test --profiles-dir .
 ```
