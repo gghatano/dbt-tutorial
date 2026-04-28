@@ -13,6 +13,9 @@ data/raw/*.csv
 !data/raw/.gitkeep
 data/exercises/inbox/*.csv
 !data/exercises/inbox/.gitkeep
+data/100-knock/**/*.csv
+data/100-knock/**/*.json
+!data/100-knock/**/.gitkeep
 
 # Terraform
 **/.terraform/

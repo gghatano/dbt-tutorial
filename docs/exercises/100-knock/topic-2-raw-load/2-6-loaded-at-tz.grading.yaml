@@ -1,0 +1,73 @@
+# Grading for 100-knock Topic 2 / Q6: loaded_at column type & TZ alignment.
+# Run: python3 scripts/grader/grade.py --grading-file docs/exercises/100-knock/topic-2-raw-load/2-6-loaded-at-tz.grading.yaml
+
+exercise: 100-knock-2-6-loaded-at-tz
+title: "2-6: source の loaded_at_field と Python 側 loaded_at 列の型・TZ を揃える"
+passing_score: 80
+
+expects_learner_files:
+  - scripts/100-knock/topic-2/load_2_1_raw.py
+  - dbt/models/100-knock/topic-2/sources.yml
+
+checks:
+  - id: loader-script-exists
+    description: "2-1 の loader script が存在する (本問の改修対象)"
+    type: file_exists
+    path: scripts/100-knock/topic-2/load_2_1_raw.py
+    points: 5
+
+  - id: loader-uses-tz-aware-now
+    description: "loader script に datetime.now(tz=timezone.utc) または timezone.utc が使われている"
+    type: shell_command
+    command: |
+      set -euo pipefail
+      grep -E "timezone\.utc|tz=timezone\.utc|ZoneInfo\(['\"]UTC['\"]\)" scripts/100-knock/topic-2/load_2_1_raw.py
+    points: 15
+
+  - id: sources-yml-loaded-at-field
+    description: "sources.yml に loaded_at_field: loaded_at が宣言されている"
+    type: shell_command
+    command: |
+      set -euo pipefail
+      grep -E "^\s*loaded_at_field:\s*loaded_at\s*$" dbt/models/100-knock/topic-2/sources.yml
+    points: 20
+
+  - id: orders-loaded-at-column-exists
+    description: "raw.orders.loaded_at 列が存在する"
+    type: sql_assert
+    sql: |
+      SELECT count(*)
+      FROM information_schema.columns
+      WHERE table_schema = 'raw'
+        AND table_name = 'orders'
+        AND column_name = 'loaded_at'
+    op: eq
+    expected: 1
+    points: 15
+
+  - id: orders-loaded-at-is-timestamptz
+    description: "raw.orders.loaded_at の型が timestamp with time zone である"
+    type: sql_assert
+    sql: |
+      SELECT data_type
+      FROM information_schema.columns
+      WHERE table_schema = 'raw'
+        AND table_name = 'orders'
+        AND column_name = 'loaded_at'
+    op: eq
+    expected: "timestamp with time zone"
+    points: 25
+
+  - id: orders-loaded-at-no-nulls
+    description: "raw.orders.loaded_at に NULL が無い (全行に値が書かれている)"
+    type: sql_assert
+    sql: "SELECT count(*) FROM raw.orders WHERE loaded_at IS NULL"
+    op: eq
+    expected: 0
+    points: 10
+
+  - id: source-freshness-runs
+    description: "dbt source freshness --select source:raw.orders が exit 0 で終わる"
+    type: dbt_command
+    command: ["dbt", "source", "freshness", "--select", "source:raw.orders"]
+    points: 10

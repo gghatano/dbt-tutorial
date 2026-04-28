@@ -1,0 +1,76 @@
+# Grading for 100-knock Topic 5 / Q9: dbt-expectations.expect_column_values_to_be_between で業務範囲テスト
+# Run: python3 scripts/grader/grade.py --grading-file docs/exercises/100-knock/topic-5-mart/5-9-mart-expectations.grading.yaml
+#
+# 採点方針:
+#   - packages.yml と dbt-expectations 行存在        25
+#   - dbt deps 後に dbt_packages/ に展開済み         20
+#   - schema.yml に expect_column_values_to_be_between 宣言   20
+#   - dbt test PASS                                  35
+#   合計 100、合格 80
+
+exercise: 100-knock-5-9-mart-expectations
+title: "5-9: mart に dbt-expectations の expect_column_values_to_be_between で業務範囲テスト"
+passing_score: 80
+
+expects_learner_files:
+  - dbt/packages.yml
+  - dbt/models/100-knock/topic-5/schema.yml
+
+checks:
+  # ----- 構造チェック (45点) -----
+
+  - id: packages-yml-exists
+    description: "dbt/packages.yml が存在する"
+    type: file_exists
+    path: dbt/packages.yml
+    min_size_bytes: 10
+    points: 10
+
+  - id: packages-yml-has-expectations
+    description: "packages.yml に calogica/dbt_expectations 行がある"
+    type: shell_command
+    command: |
+      set -euo pipefail
+      grep -E '^\s*-\s*package:\s*calogica/dbt_expectations\s*$' dbt/packages.yml >/dev/null
+    points: 15
+
+  - id: dbt-expectations-installed
+    description: "dbt deps を実行済み (dbt_packages/dbt_expectations が展開されている)"
+    type: shell_command
+    command: |
+      set -euo pipefail
+      cd dbt
+      dbt deps --profiles-dir . 2>&1 | tee /tmp/5-9-deps.log
+      test -d dbt_packages/dbt_expectations
+    points: 20
+
+  # ----- schema.yml に expectations test (20点) -----
+
+  - id: schema-yml-has-expect-be-between
+    description: "schema.yml の avg_rating 列に dbt_expectations.expect_column_values_to_be_between 宣言がある"
+    type: shell_command
+    command: |
+      set -euo pipefail
+      f=dbt/models/100-knock/topic-5/schema.yml
+      test -f "${f}"
+      grep -E 'dbt_expectations\.expect_column_values_to_be_between' "${f}" >/dev/null
+      grep -E 'min_value:\s*1' "${f}" >/dev/null
+      grep -E 'max_value:\s*5' "${f}" >/dev/null
+    points: 20
+
+  # ----- 動作チェック: dbt test PASS (35点) -----
+
+  - id: dbt-test-mart-passes
+    description: "dbt test --select mart_top_rated_products_100knock が PASS (expectations test 込み)"
+    type: shell_command
+    command: |
+      set -euo pipefail
+      cd dbt
+      dbt build --select mart_top_rated_products_100knock --profiles-dir . 2>&1 | tee /tmp/5-9-build.log
+      grep -E 'ERROR=0' /tmp/5-9-build.log >/dev/null
+      ! grep -E 'ERROR=[1-9]' /tmp/5-9-build.log >/dev/null
+      # expectations test の PASS 行が 1 件以上
+      n=$(grep -cE 'expect_column_values_to_be_between|avg_rating_in_1_to_5' /tmp/5-9-build.log || echo 0)
+      echo "expectations_test_lines=${n}"
+      test "${n}" -ge 1
+    points: 35

@@ -1,0 +1,70 @@
+# Grading for 100-knock Topic 3 / Q10: dbt build --select で staging を 1 発で run + test 通過。
+# Run: python3 scripts/grader/grade.py --grading-file docs/exercises/100-knock/topic-3-staging/3-10-build-staging.grading.yaml
+
+exercise: 100-knock-3-10-build-staging
+title: "3-10: dbt build --select 100-knock.topic-3 で staging 層を原子的に PASS"
+passing_score: 80
+
+expects_learner_files:
+  - docs/exercises/100-knock/topic-3-staging/build-log.md
+
+checks:
+  - id: build-log-md-exists
+    description: "学習者が build-log.md を作成した"
+    type: file_exists
+    path: docs/exercises/100-knock/topic-3-staging/build-log.md
+    min_size_bytes: 200
+    points: 15
+
+  - id: build-log-mentions-dbt-build
+    description: "build-log.md に dbt build コマンドが記録されている"
+    type: shell_command
+    command: |
+      set -euo pipefail
+      n=$(grep -c 'dbt build' docs/exercises/100-knock/topic-3-staging/build-log.md || echo 0)
+      echo "dbt_build_mentions=${n}"
+      test "${n}" -ge 1
+    points: 10
+
+  - id: build-log-mentions-pass-summary
+    description: "build-log.md に PASS サマリ (Done. PASS=N WARN=N ERROR=N) の引用がある"
+    type: shell_command
+    command: |
+      set -euo pipefail
+      n=$(grep -cE 'PASS=|Done\.' docs/exercises/100-knock/topic-3-staging/build-log.md || echo 0)
+      echo "pass_summary_mentions=${n}"
+      test "${n}" -ge 1
+    points: 15
+
+  - id: dbt-build-staging-success
+    description: "dbt build --select 100-knock.topic-3 が成功する (model + test 全 PASS)"
+    type: shell_command
+    command: |
+      set -euo pipefail
+      cd dbt
+      dbt build --select 100-knock.topic-3 --profiles-dir . 2>&1 | tee /tmp/3-10-build.log
+      grep -E 'ERROR=0' /tmp/3-10-build.log >/dev/null
+      ! grep -E 'ERROR=[1-9]' /tmp/3-10-build.log >/dev/null
+    points: 35
+
+  - id: dbt-build-staging-no-skip
+    description: "dbt build の出力に SKIP=0 がある (依存違反による下流 SKIP が発生していない)"
+    type: shell_command
+    command: |
+      set -euo pipefail
+      cd dbt
+      dbt build --select 100-knock.topic-3 --profiles-dir . 2>&1 | tee /tmp/3-10-build-skip.log
+      grep -E 'SKIP=0' /tmp/3-10-build-skip.log >/dev/null
+    points: 15
+
+  - id: dbt-build-staging-tests-ran
+    description: "dbt build の出力に test が含まれている (run だけでなく test も走った)"
+    type: shell_command
+    command: |
+      set -euo pipefail
+      cd dbt
+      dbt build --select 100-knock.topic-3 --profiles-dir . 2>&1 | tee /tmp/3-10-build-tests.log
+      n=$(grep -cE 'PASS .*test|test .*PASS|tests in' /tmp/3-10-build-tests.log || echo 0)
+      echo "test_lines=${n}"
+      test "${n}" -ge 1
+    points: 10

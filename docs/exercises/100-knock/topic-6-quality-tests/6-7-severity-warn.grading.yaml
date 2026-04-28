@@ -1,0 +1,69 @@
+# Grading definition for 100-knock Topic 6, Problem 6-7 (severity: warn).
+# Run by: python scripts/grader/grade.py --grading-file docs/exercises/100-knock/topic-6-quality-tests/6-7-severity-warn.grading.yaml
+#
+# 採点方針:
+#   - 構造チェック (severity: warn の grep + parse + manifest 上 severity 確認) で 50 点
+#   - 動作チェック (dbt test が WARN 含めて ERROR=0 で終わる + WARN ログ出力確認) で 50 点
+#   - dbt_test_passes は ERROR>0 のみ NG 判定なので、WARN 状態でも PASS と扱える
+#
+# 前提:
+#   - Topic ② ③ ④ ⑤ + Topic ⑥ 6-1〜6-5 完了
+#   - 6-3 で stg_products_100knock.category に accepted_values が貼られている
+#   - 学習者は schema.yml にて severity: warn を追加する
+#   - 採点時に違反データを混ぜる必要はない (本問は宣言の存在チェックが中心)。
+#     違反データを混ぜた WARN ログ確認は学習者の手元実行で確認する想定。
+
+exercise: 100-knock-6-7-severity-warn
+title: "100-knock 6-7: accepted_values に severity: warn を付け、違反 1 行混ざっても CI exit 0"
+passing_score: 80
+
+expects_learner_files:
+  - dbt/models/100-knock/topic-3/schema.yml
+
+checks:
+  # ----- 構造チェック (50 点) -----
+
+  - id: severity-warn-declared
+    description: "schema.yml に severity: warn が宣言されている"
+    type: shell_command
+    command: ["bash", "-c", "grep -E 'severity:\\s*warn' dbt/models/100-knock/topic-3/schema.yml"]
+    expect_exit_code: 0
+    points: 15
+
+  - id: parse-success
+    description: "dbt parse が成功する (severity 設定の YAML 構文 OK)"
+    type: dbt_command
+    command: ["dbt", "parse"]
+    points: 10
+
+  - id: accepted-values-test-registered
+    description: "manifest に accepted_values test (stg_products_100knock.category) が登録されている"
+    type: shell_command
+    command: ["bash", "-c", "python3 -c \"import json; m=json.load(open('dbt/target/manifest.json')); ks=[k for k in m['nodes'] if 'accepted_values_stg_products_100knock_category' in k]; assert ks, 'accepted_values test for category not found'; print(ks[0])\""]
+    expect_exit_code: 0
+    expect_stdout_match: "accepted_values_stg_products_100knock_category"
+    points: 10
+
+  - id: severity-warn-in-manifest
+    description: "manifest 上で test の config.severity が warn になっている"
+    type: shell_command
+    command: ["bash", "-c", "python3 -c \"import json; m=json.load(open('dbt/target/manifest.json')); k=[k for k in m['nodes'] if 'accepted_values_stg_products_100knock_category' in k][0]; sev=m['nodes'][k]['config'].get('severity'); assert sev=='warn', f'severity={sev!r}'; print('severity=warn confirmed')\""]
+    expect_exit_code: 0
+    expect_stdout_match: "severity=warn"
+    points: 15
+
+  # ----- 動作チェック (50 点) -----
+
+  - id: stg-products-tests-pass-or-warn
+    description: "stg_products_100knock の test が ERROR=0 で終わる (PASS / WARN いずれも合格)"
+    type: dbt_test_passes
+    select: stg_products_100knock
+    min_pass: 3
+    points: 30
+
+  - id: dbt-test-exit-zero-with-severity-warn
+    description: "severity: warn を貼った test は exit code 0 で終わる (CI を止めない)"
+    type: shell_command
+    command: ["bash", "-c", "cd dbt && dbt test --profiles-dir . --select stg_products_100knock"]
+    expect_exit_code: 0
+    points: 20

@@ -1,0 +1,51 @@
+# Grading for 100-knock Topic 1 / Q1: customers.csv 1,000 rows.
+# Run: python3 scripts/grader/grade.py --grading-file docs/exercises/100-knock/topic-1-data-generation/1-1-customers.grading.yaml
+
+exercise: 100-knock-1-1-customers
+title: "1-1: customers 1,000 行を生成"
+passing_score: 80
+
+expects_learner_files:
+  - scripts/100-knock/topic-1/generate_1_1_customers.py
+
+checks:
+  - id: script-exists
+    description: "学習者が generate_1_1_customers.py を作成した"
+    type: file_exists
+    path: scripts/100-knock/topic-1/generate_1_1_customers.py
+    points: 10
+
+  - id: script-runs
+    description: "スクリプト実行が成功する (exit 0)"
+    type: shell_command
+    command: ["python3", "scripts/100-knock/topic-1/generate_1_1_customers.py"]
+    points: 20
+
+  - id: csv-row-count
+    description: "data/100-knock/topic-1/customers.csv が 1000 データ行 + ヘッダ"
+    type: csv_assert
+    path: data/100-knock/topic-1/customers.csv
+    expect_rows: 1000
+    expect_columns: [customer_id, customer_name, email, created_at]
+    points: 25
+
+  - id: csv-pk-unique
+    description: "customer_id がユニーク"
+    type: csv_assert
+    path: data/100-knock/topic-1/customers.csv
+    expect_unique: [customer_id]
+    points: 15
+
+  - id: csv-no-null-required
+    description: "customer_id / customer_name / email に NULL なし"
+    type: csv_assert
+    path: data/100-knock/topic-1/customers.csv
+    expect_no_nulls: [customer_id, customer_name, email]
+    points: 20
+
+  - id: csv-email-unique
+    description: "email もユニーク (Faker.unique.email() の宣言効果)"
+    type: csv_assert
+    path: data/100-knock/topic-1/customers.csv
+    expect_unique: [email]
+    points: 10

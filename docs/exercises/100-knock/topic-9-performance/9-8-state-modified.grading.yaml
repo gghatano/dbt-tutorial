@@ -1,0 +1,65 @@
+# Grading for 100-knock Topic 9 / Q8: state:modified+ で差分 build。
+# Run: python3 scripts/grader/grade.py --grading-file docs/exercises/100-knock/topic-9-performance/9-8-state-modified.grading.yaml
+#
+# 注意:
+# - 学習者は事前に dbt/prev-manifest/manifest.json を用意しておくこと (Step 1)
+# - state-modified.md に変更 model 名 + 下流 model 名の grep が通ることを採点
+
+exercise: 100-knock-9-8-state-modified
+title: "9-8: --select state:modified+ で変更影響範囲 (自分と下流) のみ build"
+passing_score: 80
+
+expects_learner_files:
+  - docs/exercises/100-knock/topic-9-performance/state-modified.md
+  - dbt/prev-manifest/manifest.json
+
+checks:
+  - id: state-modified-md-exists
+    description: "state-modified.md が存在する (300 bytes 以上)"
+    type: file_exists
+    path: docs/exercises/100-knock/topic-9-performance/state-modified.md
+    min_size_bytes: 300
+    points: 15
+
+  - id: prev-manifest-exists
+    description: "dbt/prev-manifest/manifest.json が存在する (Step 1 のベースライン)"
+    type: file_exists
+    path: dbt/prev-manifest/manifest.json
+    min_size_bytes: 1000
+    points: 15
+
+  - id: doc-mentions-state-modified-selector
+    description: "state-modified.md に state:modified+ セレクタの言及がある"
+    type: shell_command
+    command: |
+      set -euo pipefail
+      doc=docs/exercises/100-knock/topic-9-performance/state-modified.md
+      n=$(grep -cE 'state:modified\+?' "$doc" || echo 0)
+      echo "selector_mentions=${n}"
+      test "${n}" -ge 1
+    points: 15
+
+  - id: doc-mentions-stg-orders-and-downstream
+    description: "state-modified.md に変更 model (stg_orders_100knock) と下流 model (int_*/mart_*) 両方の言及がある"
+    type: shell_command
+    command: |
+      set -euo pipefail
+      doc=docs/exercises/100-knock/topic-9-performance/state-modified.md
+      n_stg=$(grep -cE 'stg_orders_100knock' "$doc" || echo 0)
+      n_dn=$(grep -cE 'int_[a-z_]+_100knock|mart_[a-z_]+_100knock' "$doc" || echo 0)
+      echo "stg_mentions=${n_stg} downstream_mentions=${n_dn}"
+      test "${n_stg}" -ge 1
+      test "${n_dn}" -ge 1
+    points: 25
+
+  - id: dbt-run-state-modified-selector-runs
+    description: "dbt run --select state:modified+ --state ./prev-manifest/ が exit 0 (差分 0 でも OK)"
+    type: shell_command
+    command: |
+      set -euo pipefail
+      cd dbt
+      ../.venv/bin/dbt parse --profiles-dir . >/dev/null 2>&1
+      ../.venv/bin/dbt run --select state:modified+ --state ./prev-manifest/ --profiles-dir . --no-colors 2>&1 | tee /tmp/9-8-grader.log
+      grep -qE 'Done\.|Completed successfully|Nothing to do' /tmp/9-8-grader.log
+      ! grep -qE 'ERROR=[1-9]' /tmp/9-8-grader.log
+    points: 30

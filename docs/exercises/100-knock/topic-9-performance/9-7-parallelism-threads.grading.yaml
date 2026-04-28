@@ -1,0 +1,77 @@
+# Grading for 100-knock Topic 9 / Q7: profiles.yml threads と DAG 並列性分析。
+# Run: python3 scripts/grader/grade.py --grading-file docs/exercises/100-knock/topic-9-performance/9-7-parallelism-threads.grading.yaml
+#
+# 注意: 本問は学習者が dbt/profiles.yml を編集する。MVP の threads: 4 から増やす想定 (>=5 で合格)。
+
+exercise: 100-knock-9-7-parallelism-threads
+title: "9-7: profiles.yml の threads を 4 → 8、並列度と DAG 形状の関係を分析"
+passing_score: 80
+
+expects_learner_files:
+  - dbt/profiles.yml
+  - docs/exercises/100-knock/topic-9-performance/parallelism-analysis.md
+
+checks:
+  - id: parallelism-analysis-md-exists
+    description: "parallelism-analysis.md が存在する (300 bytes 以上)"
+    type: file_exists
+    path: docs/exercises/100-knock/topic-9-performance/parallelism-analysis.md
+    min_size_bytes: 300
+    points: 15
+
+  - id: profiles-threads-increased
+    description: "dbt/profiles.yml の threads が 4 から増やされている (>=5)"
+    type: shell_command
+    command: |
+      set -euo pipefail
+      python3 -c "
+      import yaml
+      with open('dbt/profiles.yml') as f:
+          cfg = yaml.safe_load(f)
+      threads = cfg['local_analytics']['outputs']['dev'].get('threads')
+      print(f'threads={threads!r}')
+      assert isinstance(threads, int), f'threads must be int, got {threads!r}'
+      assert threads >= 5, f'threads must be increased from 4, got {threads}'
+      "
+    points: 25
+
+  - id: analysis-mentions-parallel-keyword
+    description: "parallelism-analysis.md に「並列」キーワードが含まれる"
+    type: shell_command
+    command: |
+      set -euo pipefail
+      doc=docs/exercises/100-knock/topic-9-performance/parallelism-analysis.md
+      n=$(grep -cE '並列' "$doc" || echo 0)
+      echo "parallel_mentions=${n}"
+      test "${n}" -ge 1
+    points: 15
+
+  - id: analysis-mentions-serial-keyword
+    description: "parallelism-analysis.md に「シリアル」または「直列」キーワードが含まれる"
+    type: shell_command
+    command: |
+      set -euo pipefail
+      doc=docs/exercises/100-knock/topic-9-performance/parallelism-analysis.md
+      n=$(grep -cE 'シリアル|直列' "$doc" || echo 0)
+      echo "serial_mentions=${n}"
+      test "${n}" -ge 1
+    points: 15
+
+  - id: analysis-mentions-threads-comparison
+    description: "parallelism-analysis.md に threads の数値 (4, 8 など 2 つ以上) と所要時間の言及がある"
+    type: shell_command
+    command: |
+      set -euo pipefail
+      doc=docs/exercises/100-knock/topic-9-performance/parallelism-analysis.md
+      n_threads=$(grep -cE 'threads' "$doc" || echo 0)
+      n_time=$(grep -cE '[0-9]+(\.[0-9]+)?\s*(s|秒|ms|m\s*[0-9]+)' "$doc" || echo 0)
+      echo "threads_mentions=${n_threads} time_mentions=${n_time}"
+      test "${n_threads}" -ge 2
+      test "${n_time}" -ge 1
+    points: 15
+
+  - id: dbt-parse-success
+    description: "dbt parse が成功する (profiles.yml の編集で接続定義が壊れていない)"
+    type: dbt_command
+    command: ["parse"]
+    points: 15

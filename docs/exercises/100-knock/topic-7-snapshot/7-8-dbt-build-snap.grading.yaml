@@ -1,0 +1,60 @@
+# Grading for 100-knock Topic 7 / Q8: dbt build --select +int_... 一気通貫。
+# Run: python3 scripts/grader/grade.py --grading-file docs/exercises/100-knock/topic-7-snapshot/7-8-dbt-build-snap.grading.yaml
+#
+# 採点は CI 上で実際に dbt build を叩く設計。
+# - shell_command でログを生成 + 成果物 md にもログ片が残っていることを確認。
+
+exercise: 100-knock-7-8-dbt-build-snap
+title: "7-8: dbt build --select +int_... で snapshot → ref → test 一気通貫"
+passing_score: 80
+
+expects_learner_files:
+  - docs/exercises/100-knock/topic-7-snapshot/build-log.md
+
+checks:
+  - id: build-log-md-exists
+    description: "build-log.md が存在する (300 bytes 以上)"
+    type: file_exists
+    path: docs/exercises/100-knock/topic-7-snapshot/build-log.md
+    min_size_bytes: 300
+    points: 15
+
+  - id: build-log-mentions-snapshot-step
+    description: "build-log.md に snapshot ステップの行が含まれる (snap_products_100knock への言及)"
+    type: shell_command
+    command: |
+      set -euo pipefail
+      doc=docs/exercises/100-knock/topic-7-snapshot/build-log.md
+      grep -qE 'snap(shot)?' "$doc"
+      grep -qE 'snap_products_100knock' "$doc"
+      echo "build-log mentions snapshot step"
+    points: 15
+
+  - id: build-log-mentions-model-step
+    description: "build-log.md に int_orders_with_historical_price_100knock の行が含まれる"
+    type: shell_command
+    command: |
+      set -euo pipefail
+      grep -qE 'int_orders_with_historical_price_100knock' \
+        docs/exercises/100-knock/topic-7-snapshot/build-log.md
+      echo "build-log mentions consumer model"
+    points: 15
+
+  - id: dbt-build-runs-clean
+    description: "dbt build --select +int_orders_with_historical_price_100knock が完走 (exit 0)"
+    type: dbt_command
+    command: ["build", "--select", "+int_orders_with_historical_price_100knock"]
+    points: 35
+
+  - id: dbt-build-snapshot-step-present-in-fresh-log
+    description: "fresh log にも snapshot ステップが必ず含まれる (--select +<node> で snap が拾われる)"
+    type: shell_command
+    command: |
+      set -euo pipefail
+      cd dbt
+      ../.venv/bin/dbt build --profiles-dir . \
+        --select +int_orders_with_historical_price_100knock \
+        --no-colors 2>&1 | tee /tmp/build-7-8-grader.log >/dev/null
+      grep -qE 'snap(shot)?ed?[^a-z]+snapshots\.snap_products_100knock|snapshot.*snap_products_100knock' /tmp/build-7-8-grader.log
+      echo "fresh build log contains snapshot step"
+    points: 20

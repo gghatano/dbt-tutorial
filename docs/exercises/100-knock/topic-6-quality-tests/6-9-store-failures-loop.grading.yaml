@@ -1,0 +1,71 @@
+# Grading definition for 100-knock Topic 6, Problem 6-9 (store_failures loop).
+# Run by: python scripts/grader/grade.py --grading-file docs/exercises/100-knock/topic-6-quality-tests/6-9-store-failures-loop.grading.yaml
+#
+# 採点方針:
+#   - 構造チェック (store_failures: true 宣言 + parse + manifest config 確認) で 60 点
+#   - 動作チェック (dbt test PASS で運用ループの完了状態 + audit schema は手元確認) で 40 点
+#   - 学習体験は「失敗 → SELECT → 修正 → 再 test PASS」 の 1 ループ走破。grader は
+#     最終的な「PASS に戻った状態」 を確認する (途中の FAIL 状態は採点対象外)。
+#   - dbt_test__audit schema の存在は、grader 実行前に「学習者が一度も dbt test
+#     をしていない」 と作られないので、shell_command で「最後の dbt test を 1 回打つ」
+#     ステップを採点中に走らせて存在確認する設計。
+#
+# 前提:
+#   - Topic ② ③ ④ ⑤ + Topic ⑥ 6-1〜6-5 完了
+#   - 6-3 で stg_products_100knock.category に accepted_values 宣言済み
+#   - 学習者は schema.yml に store_failures: true を追加して PASS 状態にしてある
+
+exercise: 100-knock-6-9-store-failures-loop
+title: "100-knock 6-9: store_failures: true で失敗行を SQL 追跡 → 修正 → 再 test PASS"
+passing_score: 80
+
+expects_learner_files:
+  - dbt/models/100-knock/topic-3/schema.yml
+
+checks:
+  # ----- 構造チェック (60 点) -----
+
+  - id: store-failures-declared
+    description: "schema.yml に store_failures: true が宣言されている"
+    type: shell_command
+    command: ["bash", "-c", "grep -E 'store_failures:\\s*true' dbt/models/100-knock/topic-3/schema.yml"]
+    expect_exit_code: 0
+    points: 20
+
+  - id: parse-success
+    description: "dbt parse が成功する"
+    type: dbt_command
+    command: ["dbt", "parse"]
+    points: 10
+
+  - id: store-failures-in-manifest
+    description: "manifest 上で test の config.store_failures が true になっている"
+    type: shell_command
+    command: ["bash", "-c", "python3 -c \"import json; m=json.load(open('dbt/target/manifest.json')); ks=[k for k in m['nodes'] if 'accepted_values_stg_products_100knock_category' in k]; assert ks, 'accepted_values test not found'; sf=m['nodes'][ks[0]]['config'].get('store_failures'); assert sf is True, f'store_failures={sf!r}'; print('store_failures=true confirmed')\""]
+    expect_exit_code: 0
+    expect_stdout_match: "store_failures=true"
+    points: 15
+
+  - id: stg-products-tests-pass-after-loop
+    description: "stg_products_100knock の test が PASS (失敗ループを完了して修正済み)"
+    type: dbt_test_passes
+    select: stg_products_100knock
+    min_pass: 3
+    points: 15
+
+  # ----- 動作チェック (40 点) -----
+
+  - id: dbt-test-creates-audit-schema
+    description: "dbt test 実行で dbt_test__audit schema が作成可能 (store_failures が物理化される)"
+    type: shell_command
+    command: ["bash", "-c", "cd dbt && dbt test --profiles-dir . --select stg_products_100knock --store-failures"]
+    expect_exit_code: 0
+    points: 20
+
+  - id: audit-schema-exists
+    description: "dbt_test__audit schema が Postgres 上に存在する (失敗行追跡が可能な状態)"
+    type: sql_assert
+    sql: "SELECT count(*) FROM information_schema.schemata WHERE schema_name='dbt_test__audit'"
+    op: gte
+    expected: 1
+    points: 20

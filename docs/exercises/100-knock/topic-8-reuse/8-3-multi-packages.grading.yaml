@@ -1,0 +1,70 @@
+# Grading definition for 100-knock Topic 8, Problem 8-3 (dbt-utils + dbt-expectations 共存).
+# Run by: python scripts/grader/grade.py --grading-file docs/exercises/100-knock/topic-8-reuse/8-3-multi-packages.grading.yaml
+#
+# 採点方針:
+#   - 構造チェック (file_exists / shell grep) で 60 点
+#   - 実行チェック (dbt deps + parse) で 40 点
+#
+# 前提:
+#   - 8-2 完了 (dbt-utils 入っている)
+#   - 学習者が packages.yml に dbt-expectations を追加
+#   - CI workflow が dbt deps を回す
+
+exercise: 100-knock-8-3-multi-packages
+title: "100-knock 8-3: dbt-expectations を packages.yml に追加、dbt-utils と共存"
+passing_score: 80
+
+expects_learner_files:
+  - dbt/packages.yml
+
+checks:
+  # ----- 構造チェック (60 点) -----
+
+  - id: packages-yml-has-two-entries
+    description: "dbt/packages.yml に dbt-utils と dbt-expectations の 2 entries が宣言されている"
+    type: shell_command
+    command: |
+      set -euo pipefail
+      grep -E 'dbt-labs/dbt_utils'         dbt/packages.yml >/dev/null
+      grep -E 'calogica/dbt_expectations'  dbt/packages.yml >/dev/null
+      n=$(grep -cE '^\s*-\s*package:'      dbt/packages.yml || echo 0)
+      echo "package_entries=${n}"
+      test "${n}" -ge 2
+    points: 20
+
+  - id: dbt-utils-installed
+    description: "dbt deps 後、dbt/dbt_packages/dbt_utils/dbt_project.yml が存在"
+    type: file_exists
+    path: dbt/dbt_packages/dbt_utils/dbt_project.yml
+    points: 15
+
+  - id: dbt-expectations-installed
+    description: "dbt deps 後、dbt/dbt_packages/dbt_expectations/dbt_project.yml が存在"
+    type: file_exists
+    path: dbt/dbt_packages/dbt_expectations/dbt_project.yml
+    points: 15
+
+  - id: package-lock-has-two-entries
+    description: "dbt/package-lock.yml に 2 packages が記録されている"
+    type: shell_command
+    command: |
+      set -euo pipefail
+      test -f dbt/package-lock.yml
+      grep -E 'dbt-labs/dbt_utils'         dbt/package-lock.yml >/dev/null
+      grep -E 'calogica/dbt_expectations'  dbt/package-lock.yml >/dev/null
+      echo "package_lock_ok"
+    points: 10
+
+  # ----- 実行チェック (40 点) -----
+
+  - id: dbt-deps-success
+    description: "dbt deps が成功する (2 packages 解決 + インストール完了)"
+    type: dbt_command
+    command: ["deps"]
+    points: 25
+
+  - id: parse-success
+    description: "dbt parse が成功する (両パッケージ macro 読み込み後の構文 OK)"
+    type: dbt_command
+    command: ["parse"]
+    points: 15

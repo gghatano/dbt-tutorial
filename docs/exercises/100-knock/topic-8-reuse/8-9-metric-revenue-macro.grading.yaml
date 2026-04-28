@@ -1,0 +1,79 @@
+# Grading for 100-knock Topic 8 / Q9: 自作 macro metric_revenue で KPI 集計式を 1 箇所に集約
+# Run: python3 scripts/grader/grade.py --grading-file docs/exercises/100-knock/topic-8-reuse/8-9-metric-revenue-macro.grading.yaml
+#
+# 採点方針:
+#   - 構造チェック (file_exists + return + 3 mart 呼び出し)   55
+#   - 動作チェック (build 成功 + 3 mart の合計一致)            45
+#   合計 100、合格 80
+#
+# 前提:
+#   - Topic ② 〜 ⑤ + Topic ⑧ 8-1〜8-8 完了
+#   - dbt/models/100-knock/topic-4/int_order_details_100knock.sql が存在し、
+#     order_date / customer_id / product_id / sales_amount 列を持つ
+
+exercise: 100-knock-8-9-metric-revenue-macro
+title: "8-9: 自作 macro metric_revenue で KPI 集計式を 1 箇所に集約 (1 macro → 3 mart の収束)"
+passing_score: 80
+
+expects_learner_files:
+  - dbt/macros/100-knock/topic-8/metric_revenue.sql
+
+checks:
+  # ----- 構造チェック (55点) -----
+
+  - id: metric-revenue-macro-file-exists
+    description: "dbt/macros/100-knock/topic-8/metric_revenue.sql が存在する"
+    type: file_exists
+    path: dbt/macros/100-knock/topic-8/metric_revenue.sql
+    min_size_bytes: 50
+    points: 15
+
+  - id: macro-uses-return
+    description: "metric_revenue.sql 内で {{ return(...) }} が使われている"
+    type: shell_command
+    command: |
+      set -euo pipefail
+      f=dbt/macros/100-knock/topic-8/metric_revenue.sql
+      n=$(grep -cE "\\{\\{\\s*return\\(" "$f" || echo 0)
+      echo "return_calls=${n}"
+      test "${n}" -ge 1
+    points: 15
+
+  - id: three-marts-call-macro
+    description: "100-knock/topic-8/ の少なくとも 3 mart で {{ metric_revenue(...) }} が呼ばれている"
+    type: shell_command
+    command: |
+      set -euo pipefail
+      n=$(grep -rlE "\\{\\{\\s*metric_revenue\\(" dbt/models/100-knock/topic-8/ 2>/dev/null | wc -l | tr -d ' ')
+      echo "marts_calling_macro=${n}"
+      test "${n}" -ge 3
+    points: 25
+
+  # ----- 動作チェック (45点) -----
+
+  - id: dbt-build-three-marts-success
+    description: "dbt build --select 100-knock.topic-8 が成功する (= 3 mart が macro 経由で正しく compile/run できる)"
+    type: shell_command
+    command: |
+      set -euo pipefail
+      cd dbt
+      dbt build --select 100-knock.topic-8 --profiles-dir . 2>&1 | tee /tmp/8-9-build.log
+      grep -E 'ERROR=0' /tmp/8-9-build.log >/dev/null
+      ! grep -E 'ERROR=[1-9]' /tmp/8-9-build.log >/dev/null
+    points: 20
+
+  - id: three-marts-revenue-sums-equal
+    description: "3 mart (daily / customer / product) の revenue 合計が一致する (= 同じ macro / 同じソースから派生した証跡)"
+    type: sql_assert
+    sql: |
+      SELECT
+        CASE
+          WHEN (SELECT round(sum(revenue),2) FROM marts.mart_daily_revenue_100knock) =
+               (SELECT round(sum(revenue),2) FROM marts.mart_customer_revenue_100knock)
+           AND (SELECT round(sum(revenue),2) FROM marts.mart_customer_revenue_100knock) =
+               (SELECT round(sum(revenue),2) FROM marts.mart_product_revenue_100knock)
+          THEN 1 ELSE 0
+        END
+    op: eq
+    expected: 1
+    points: 25

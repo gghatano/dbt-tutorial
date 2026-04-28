@@ -1,0 +1,75 @@
+# Grading definition for 100-knock Topic 5, Problem 5-2
+# (mart_monthly_sales_by_category_100knock with composite grain + surrogate key).
+# Run by:
+#   python3 scripts/grader/grade.py \
+#     --grading-file docs/exercises/100-knock/topic-5-mart/5-2-mart-monthly-by-category.grading.yaml
+#
+# 採点方針:
+#   - 構造チェック (file_exists / manifest_node) で 35 点
+#   - データチェック (dbt_test on PK / sql_assert on grain) で 65 点
+#   - 「複合 grain が機械検証されているか」を unique test と sql_assert の二段で確認
+#
+# 前提:
+#   - dbt-utils が packages.yml に追加され、dbt deps 済み
+#   - Topic ④ で int_order_details_100knock を実装済み
+#     (未実装なら学習者が MVP の int_order_details を ref しても本問は通る)
+
+exercise: 100-knock-5-2-mart-monthly-by-category
+title: "100-knock 5-2: mart_monthly_sales_by_category_100knock を複合 grain (月 × カテゴリ) で新規作成"
+passing_score: 80
+
+expects_learner_files:
+  - dbt/packages.yml
+  - dbt/models/100-knock/topic-5/mart_monthly_sales_by_category_100knock.sql
+  - dbt/models/100-knock/topic-5/schema.yml
+
+checks:
+  # ----- 構造チェック (35 点) -----
+
+  - id: mart-file-exists
+    description: "dbt/models/100-knock/topic-5/mart_monthly_sales_by_category_100knock.sql が存在する"
+    type: file_exists
+    path: dbt/models/100-knock/topic-5/mart_monthly_sales_by_category_100knock.sql
+    points: 10
+
+  - id: parse-success
+    description: "dbt parse が成功する (dbt-utils マクロが解決できている)"
+    type: dbt_command
+    command: ["dbt", "parse"]
+    points: 10
+
+  - id: mart-node-registered
+    description: "manifest に model.local_analytics.mart_monthly_sales_by_category_100knock が登録されている"
+    type: manifest_node_exists
+    node: model.local_analytics.mart_monthly_sales_by_category_100knock
+    points: 15
+
+  # ----- データチェック (65 点) -----
+
+  - id: mart-pk-unique-not-null
+    description: "monthly_category_id (サロゲート PK) の unique + not_null test が PASS"
+    type: dbt_test_passes
+    select: mart_monthly_sales_by_category_100knock
+    min_pass: 2
+    points: 25
+
+  - id: grain-uniqueness-by-sql
+    description: "(month, category) の組合せが mart 内で unique (= 複合 grain 違反 0 行)"
+    type: sql_assert
+    sql: |
+      SELECT count(*) FROM (
+        SELECT month, category, count(*) AS n
+        FROM marts.mart_monthly_sales_by_category_100knock
+        GROUP BY month, category HAVING count(*) > 1
+      ) AS dups
+    op: eq
+    expected: 0
+    points: 25
+
+  - id: mart-has-rows
+    description: "mart が 1 行以上ある (月 × カテゴリの集計が走っている)"
+    type: sql_assert
+    sql: "SELECT count(*) FROM marts.mart_monthly_sales_by_category_100knock"
+    op: gte
+    expected: 1
+    points: 15

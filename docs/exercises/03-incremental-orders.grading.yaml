@@ -1,0 +1,66 @@
+# Grading definition for Exercise 03 (新規注文を incremental に取り込む).
+# Run by: python scripts/grader/grade.py --exercise 03
+#
+# Note: this exercise has a 2-step data flow (1日目: 500行ロード+run, 2日目:
+# 500行 append+run)。CI は両方を通した状態 (= raw.orders_increment が 1000 行
+# 積まれた状態で 2 回 dbt run 済み) で grader を呼ぶ前提なので、最終件数の
+# 期待値は 1000 行とする。
+
+exercise: 03-incremental-orders
+title: "Exercise 03: 新規注文を incremental に取り込む"
+passing_score: 80   # need >= 80% of total points to PASS
+
+# Files the learner is expected to create (UX hint only).
+expects_learner_files:
+  - dbt/models/exercises/03/sources.yml
+  - dbt/models/exercises/03/stg_orders_inc.sql
+  - dbt/models/exercises/03/schema.yml
+
+checks:
+  # ----- structural (manifest-only, no DB needed) -----
+
+  - id: stg-orders-inc-file-exists
+    description: "dbt/models/exercises/03/stg_orders_inc.sql が存在する"
+    type: file_exists
+    path: dbt/models/exercises/03/stg_orders_inc.sql
+    points: 10
+
+  - id: stg-orders-inc-node-registered
+    description: "manifest に model.local_analytics.stg_orders_inc が登録されている"
+    type: manifest_node_exists
+    node: model.local_analytics.stg_orders_inc
+    points: 10
+
+  - id: stg-orders-inc-config
+    description: "stg_orders_inc が materialized=incremental かつ unique_key=order_id で宣言されている"
+    type: manifest_config
+    node: model.local_analytics.stg_orders_inc
+    expected:
+      materialized: incremental
+      unique_key: order_id
+    points: 25
+
+  # ----- runtime (dbt) -----
+
+  - id: stg-orders-inc-run
+    description: "dbt run --select stg_orders_inc が成功する (incremental ビルドが通る)"
+    type: dbt_command
+    command: ["dbt", "run", "--select", "stg_orders_inc"]
+    points: 15
+
+  # ----- data-level (requires DB) -----
+
+  - id: stg-orders-inc-tests-pass
+    description: "dbt test --select stg_orders_inc が全件 PASS (order_id の unique/not_null など)"
+    type: dbt_test_passes
+    select: stg_orders_inc
+    min_pass: 3
+    points: 15
+
+  - id: stg-orders-inc-row-count
+    description: "staging.stg_orders_inc が 1000 行 (1日目 500 + 2日目 500 を incremental 統合できている)"
+    type: sql_assert
+    sql: "SELECT count(*) FROM staging.stg_orders_inc"
+    op: eq
+    expected: 1000
+    points: 25
