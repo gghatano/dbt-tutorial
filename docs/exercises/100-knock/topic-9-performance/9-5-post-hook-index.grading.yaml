@@ -1,0 +1,75 @@
+# Grading for 100-knock Topic 9 / Q5: post_hook で index を貼り、explain analyze で cost 比較。
+# Run: python3 scripts/grader/grade.py --grading-file docs/exercises/100-knock/topic-9-performance/9-5-post-hook-index.grading.yaml
+#
+# 採点は「post_hook 設定 + index 物理存在 + 比較ドキュメント」 を確認。
+
+exercise: 100-knock-9-5-post-hook-index
+title: "9-5: post_hook で incremental mart に index を貼り、explain analyze で cost 比較"
+passing_score: 80
+
+expects_learner_files:
+  - dbt/models/100-knock/topic-9/mart_orders_incremental_100knock.sql
+  - docs/exercises/100-knock/topic-9-performance/index-comparison.md
+
+checks:
+  - id: model-file-exists
+    description: "mart_orders_incremental_100knock.sql が存在する"
+    type: file_exists
+    path: dbt/models/100-knock/topic-9/mart_orders_incremental_100knock.sql
+    min_size_bytes: 100
+    points: 10
+
+  - id: comparison-doc-exists
+    description: "index-comparison.md が存在する (200 bytes 以上)"
+    type: file_exists
+    path: docs/exercises/100-knock/topic-9-performance/index-comparison.md
+    min_size_bytes: 200
+    points: 10
+
+  - id: post-hook-declared-in-sql
+    description: "SQL 内に post_hook で create index if not exists ix_orders_order_date 宣言"
+    type: shell_command
+    command: |
+      set -euo pipefail
+      f="dbt/models/100-knock/topic-9/mart_orders_incremental_100knock.sql"
+      grep -q "post_hook" "$f"
+      grep -qE "create index if not exists ix_orders_order_date" "$f"
+      echo "post_hook + index DDL declared"
+    points: 25
+
+  - id: post-hook-in-manifest
+    description: "manifest 上 post-hook 設定が存在する (空でない)"
+    type: shell_command
+    command: |
+      set -euo pipefail
+      python3 -c "
+      import json, sys
+      with open('dbt/target/manifest.json') as f:
+          m = json.load(f)
+      node = m['nodes']['model.local_analytics.mart_orders_incremental_100knock']
+      hooks = node['config'].get('post-hook', [])
+      assert hooks, 'post-hook is empty in manifest'
+      assert any('ix_orders_order_date' in (h.get('sql') if isinstance(h, dict) else h) for h in hooks), \
+          'ix_orders_order_date not found in post-hook SQL'
+      print('post-hook contains ix_orders_order_date')
+      "
+    points: 20
+
+  - id: dbt-run-fires-post-hook
+    description: "dbt run --select mart_orders_incremental_100knock が成功する (post_hook も発火)"
+    type: dbt_command
+    command: ["run", "--select", "mart_orders_incremental_100knock"]
+    points: 15
+
+  - id: index-exists-in-pg
+    description: "DB 上で ix_orders_order_date が pg_indexes に存在する"
+    type: sql_assert
+    sql: |
+      SELECT count(*)::bigint
+      FROM pg_indexes
+      WHERE schemaname = 'marts'
+        AND tablename = 'mart_orders_incremental_100knock'
+        AND indexname = 'ix_orders_order_date'
+    op: eq
+    expected: 1
+    points: 20

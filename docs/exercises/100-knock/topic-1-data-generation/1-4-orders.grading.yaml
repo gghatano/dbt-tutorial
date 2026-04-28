@@ -1,0 +1,80 @@
+# Grading definition for 100-knock Topic 1, Problem 1-4 (orders 10,000 rows + FK ranges).
+# Run by: python scripts/grader/grade.py --grading-file docs/exercises/100-knock/topic-1-data-generation/1-4-orders.grading.yaml
+
+exercise: 100-knock-1-4-orders
+title: "100-knock 1-4: orders 10,000 行 + FK 範囲を Python で先に宣言"
+passing_score: 80   # need >= 80% of total points to PASS
+
+expects_learner_files:
+  - scripts/100-knock/topic-1/generate_1_04_orders.py
+
+checks:
+  # ----- structural -----
+
+  - id: script-exists
+    description: "scripts/100-knock/topic-1/generate_1_04_orders.py が存在する"
+    type: file_exists
+    path: scripts/100-knock/topic-1/generate_1_04_orders.py
+    points: 10
+
+  - id: run-generator
+    description: "スクリプトが exit 0 で完了し orders.csv を作る"
+    type: shell_command
+    command: ".venv/bin/python scripts/100-knock/topic-1/generate_1_04_orders.py && test -f data/100-knock/topic-1/orders.csv"
+    timeout_sec: 60
+    points: 20
+
+  # ----- behavioural (CSV) -----
+
+  - id: orders-shape-and-pk
+    description: "orders.csv が 10,000 行ある + order_id がユニーク"
+    type: csv_assert
+    path: data/100-knock/topic-1/orders.csv
+    expect_rows: 10000
+    expect_columns:
+      - order_id
+      - order_date
+      - customer_id
+      - product_id
+      - store_id
+      - quantity
+      - unit_price
+    expect_unique:
+      - order_id
+    points: 30
+
+  - id: fk-ranges-bounded
+    description: "customer_id <= 1000, product_id <= 100, store_id <= 20 を満たす (FK 範囲チェック)"
+    type: shell_command
+    command: |
+      set -euo pipefail
+      CSV=data/100-knock/topic-1/orders.csv
+      MAX_CUST=$(awk -F, 'NR>1{print $3}' "$CSV" | sort -n | tail -1)
+      MAX_PROD=$(awk -F, 'NR>1{print $4}' "$CSV" | sort -n | tail -1)
+      MAX_STORE=$(awk -F, 'NR>1{print $5}' "$CSV" | sort -n | tail -1)
+      MIN_CUST=$(awk -F, 'NR>1{print $3}' "$CSV" | sort -n | head -1)
+      MIN_PROD=$(awk -F, 'NR>1{print $4}' "$CSV" | sort -n | head -1)
+      MIN_STORE=$(awk -F, 'NR>1{print $5}' "$CSV" | sort -n | head -1)
+      echo "customer_id range: $MIN_CUST..$MAX_CUST"
+      echo "product_id  range: $MIN_PROD..$MAX_PROD"
+      echo "store_id    range: $MIN_STORE..$MAX_STORE"
+      [ "$MAX_CUST"  -le 1000 ] || { echo "FAIL: customer_id max $MAX_CUST > 1000"; exit 1; }
+      [ "$MAX_PROD"  -le  100 ] || { echo "FAIL: product_id max $MAX_PROD > 100";  exit 1; }
+      [ "$MAX_STORE" -le   20 ] || { echo "FAIL: store_id max $MAX_STORE > 20";    exit 1; }
+      [ "$MIN_CUST"  -ge    1 ] || { echo "FAIL: customer_id min $MIN_CUST < 1";   exit 1; }
+      [ "$MIN_PROD"  -ge    1 ] || { echo "FAIL: product_id min $MIN_PROD < 1";    exit 1; }
+      [ "$MIN_STORE" -ge    1 ] || { echo "FAIL: store_id min $MIN_STORE < 1";     exit 1; }
+      echo OK
+    expect_stdout_match: "OK"
+    points: 25
+
+  - id: pk-and-fk-no-nulls
+    description: "order_id / customer_id / product_id / store_id に NULL が無い"
+    type: csv_assert
+    path: data/100-knock/topic-1/orders.csv
+    expect_no_nulls:
+      - order_id
+      - customer_id
+      - product_id
+      - store_id
+    points: 15

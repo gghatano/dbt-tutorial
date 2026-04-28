@@ -1,0 +1,77 @@
+# Grading definition for Exercise 07 (dbt-utils 導入 + 日次カレンダーマート).
+# Run by: python scripts/grader/grade.py --exercise 07
+#
+# CI 前提:
+#   - 学習者が dbt/packages.yml に dbt-labs/dbt_utils を追記している。
+#   - workflow 側が `dbt deps` を実行し、dbt/dbt_packages/dbt_utils/ を展開済み。
+#   - dbt build で int_calendar / mart_calendar_sales もビルド済み。
+#   - ダミーデータは 365 日連続なので mart_calendar_sales は 365 行になる想定。
+
+exercise: 07-dbt-utils
+title: "Exercise 07: dbt-utils を導入してマートを DRY にする"
+passing_score: 80   # need >= 80% of total points to PASS
+
+expects_learner_files:
+  - dbt/packages.yml
+  - dbt/models/exercises/07/int_calendar.sql
+  - dbt/models/exercises/07/mart_calendar_sales.sql
+
+checks:
+  # ----- structural -----
+
+  - id: parse-success
+    description: "dbt parse が成功する (dbt_utils macro 解決を含む)"
+    type: dbt_command
+    command: ["dbt", "parse"]
+    points: 10
+
+  - id: packages-yml-exists
+    description: "dbt/packages.yml が存在する (dbt-utils を宣言する場所)"
+    type: file_exists
+    path: dbt/packages.yml
+    points: 5
+
+  - id: dbt-utils-installed
+    description: "dbt deps 後、dbt/dbt_packages/dbt_utils/ が展開されている"
+    type: file_exists
+    path: dbt/dbt_packages/dbt_utils/dbt_project.yml
+    points: 15
+
+  - id: int-calendar-declared
+    description: "manifest に model.local_analytics.int_calendar が登録されている"
+    type: manifest_node_exists
+    node: model.local_analytics.int_calendar
+    points: 15
+
+  - id: mart-calendar-sales-declared
+    description: "manifest に model.local_analytics.mart_calendar_sales が登録されている"
+    type: manifest_node_exists
+    node: model.local_analytics.mart_calendar_sales
+    points: 15
+
+  - id: mart-calendar-sales-depends-on-calendar
+    description: "mart_calendar_sales が int_calendar と mart_daily_sales に depends_on している"
+    type: manifest_lineage
+    node: model.local_analytics.mart_calendar_sales
+    upstream_min_count: 2
+    upstream_must_include:
+      - model.local_analytics.int_calendar
+      - model.local_analytics.mart_daily_sales
+    points: 15
+
+  # ----- behavioural (test + data) -----
+
+  - id: calendar-models-tests-pass
+    description: "int_calendar / mart_calendar_sales の dbt test が PASS (not_null / unique 等)"
+    type: dbt_test_passes
+    select: int_calendar mart_calendar_sales
+    min_pass: 4
+    points: 15
+
+  - id: mart-calendar-sales-row-count-365
+    description: "marts.mart_calendar_sales が 365 行 (ダミーデータの 1 年連続日付)"
+    type: sql_assert
+    sql: "SELECT count(*)::int FROM marts.mart_calendar_sales"
+    op: eq
+    expected: 365
+    points: 10

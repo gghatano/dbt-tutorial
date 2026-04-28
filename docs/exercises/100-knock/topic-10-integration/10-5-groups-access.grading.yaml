@@ -1,0 +1,101 @@
+# Grading for 100-knock Topic 10 / Q5: groups: + access: で int model を private 化
+# Run: python3 scripts/grader/grade.py --grading-file docs/exercises/100-knock/topic-10-integration/10-5-groups-access.grading.yaml
+#
+# 採点方針:
+#   - file_exists で _groups.yml と int model の存在 (15)
+#   - shell_command で _groups.yml に subscription_internal が含まれる (10)
+#   - dbt_command で parse 通過 (15)
+#   - manifest_config で int model の group + access (30)
+#   - shell_command で「別 group ref → parse error」を self-cleaning で確認 (30)
+#       → 一時的に fail model を作成 → parse 失敗を期待 → 必ず削除 → 再 parse で緑
+#   合計 100、合格 80。
+
+exercise: 100-knock-10-5-groups-access
+title: "10-5: groups: + access: で int model を subscription_internal の private にする"
+passing_score: 80
+
+expects_learner_files:
+  - dbt/models/100-knock/topic-10/_groups.yml
+  - dbt/models/100-knock/topic-10/int_subscription_events_enriched_100knock.sql
+  - dbt/models/100-knock/topic-10/schema.yml
+
+checks:
+  - id: groups-yml-exists
+    description: "_groups.yml が存在し 50 bytes 以上"
+    type: file_exists
+    path: dbt/models/100-knock/topic-10/_groups.yml
+    min_size_bytes: 50
+    points: 7
+
+  - id: int-sql-exists
+    description: "int_subscription_events_enriched_100knock.sql が存在し 100 bytes 以上"
+    type: file_exists
+    path: dbt/models/100-knock/topic-10/int_subscription_events_enriched_100knock.sql
+    min_size_bytes: 100
+    points: 8
+
+  - id: groups-yml-has-subscription-internal
+    description: "_groups.yml に subscription_internal group が宣言されている"
+    type: shell_command
+    command: |
+      set -euo pipefail
+      grep -E '^\s*-\s*name:\s*subscription_internal\s*$' \
+        dbt/models/100-knock/topic-10/_groups.yml >/dev/null
+    points: 10
+
+  - id: dbt-parse-success
+    description: "dbt parse が成功 (_groups.yml + config の構文 OK)"
+    type: dbt_command
+    command: ["dbt", "parse"]
+    points: 15
+
+  - id: manifest-config-group-private
+    description: "manifest 上で int model の config.group=subscription_internal かつ access=private"
+    type: manifest_config
+    node: model.local_analytics.int_subscription_events_enriched_100knock
+    expected:
+      config.group: subscription_internal
+      access: private
+    points: 30
+
+  - id: cross-group-ref-fails-self-cleaning
+    description: |
+      別 group の model から private model を ref() すると dbt parse が
+      Compilation Error で fail することを self-cleaning で確認:
+        1. 一時 fail model + 一時 group を追加
+        2. dbt parse → fail を期待
+        3. 必ず削除 (確実にクリーンアップ)
+        4. 再 parse で緑に戻る
+    type: shell_command
+    command: |
+      set -uo pipefail
+      cd dbt
+      TEST_SQL=models/100-knock/topic-10/_test_cross_group_grading.sql
+      GROUPS_YML=models/100-knock/topic-10/_groups.yml
+      GROUPS_YML_BAK=/tmp/_groups.yml.bak.$$
+      cp "${GROUPS_YML}" "${GROUPS_YML_BAK}"
+      printf '\n  - name: _grading_marts_external\n    owner:\n      email: grading@example.com\n' >> "${GROUPS_YML}"
+      printf "%s\n%s\n" "{{ config(materialized='view', schema='staging', group='_grading_marts_external') }}" "select * from {{ ref('int_subscription_events_enriched_100knock') }}" > "${TEST_SQL}"
+      ../.venv/bin/dbt parse --profiles-dir . > /tmp/10-5-grading-parse.log 2>&1
+      parse_exit=$?
+      rm -f "${TEST_SQL}"
+      cp "${GROUPS_YML_BAK}" "${GROUPS_YML}"
+      rm -f "${GROUPS_YML_BAK}"
+      if [ "${parse_exit}" -eq 0 ]; then
+        echo "FAIL: parse should have failed but exit=0"
+        tail -50 /tmp/10-5-grading-parse.log
+        ../.venv/bin/dbt parse --profiles-dir . > /dev/null 2>&1 || true
+        exit 1
+      fi
+      if ! grep -iE 'private|access|subscription_internal' /tmp/10-5-grading-parse.log >/dev/null; then
+        echo "FAIL: parse failed but error message did not mention private/access"
+        tail -50 /tmp/10-5-grading-parse.log
+        exit 1
+      fi
+      if ! ../.venv/bin/dbt parse --profiles-dir . > /tmp/10-5-grading-reparse.log 2>&1; then
+        echo "FAIL: post-cleanup parse failed (cleanup imperfect)"
+        tail -30 /tmp/10-5-grading-reparse.log
+        exit 1
+      fi
+      echo "OK: cross-group ref correctly rejected by access=private; cleanup successful"
+    points: 30

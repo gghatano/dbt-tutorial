@@ -1,0 +1,62 @@
+# Grading definition for 100-knock Topic 6, Problem 6-10 (data_tests policy in dbt_project.yml).
+# Run by: python scripts/grader/grade.py --grading-file docs/exercises/100-knock/topic-6-quality-tests/6-10-data-tests-policy.grading.yaml
+#
+# 採点方針:
+#   - 構造チェック (dbt_project.yml に data_tests + staging + +store_failures: true) で 50 点
+#   - 動作チェック (parse 成功 + manifest 上で staging test に store_failures 継承) で 50 点
+#   - 採点は「dbt_project.yml を編集した状態」 で実行する。学習者は採点後に
+#     ロールバックする運用 (本問の問題文 Step 5 参照)。
+#
+# 前提:
+#   - Topic ② ③ ④ ⑤ + Topic ⑥ 6-1〜6-9 完了
+#   - 学習者は dbt_project.yml に data_tests: ブロックを追加して staging だけに
+#     +store_failures: true を継承させる
+
+exercise: 100-knock-6-10-data-tests-policy
+title: "100-knock 6-10: dbt_project.yml の data_tests: で staging だけに +store_failures: true"
+passing_score: 80
+
+expects_learner_files:
+  - dbt/dbt_project.yml
+
+checks:
+  # ----- 構造チェック (50 点) -----
+
+  - id: data-tests-block-declared
+    description: "dbt_project.yml に data_tests: ブロックがある"
+    type: shell_command
+    command: ["bash", "-c", "grep -E '^data_tests:' dbt/dbt_project.yml"]
+    expect_exit_code: 0
+    points: 15
+
+  - id: staging-store-failures-declared
+    description: "data_tests.local_analytics.staging の +store_failures: true が宣言されている"
+    type: shell_command
+    command: ["bash", "-c", "python3 -c \"import yaml; d=yaml.safe_load(open('dbt/dbt_project.yml')); v=d.get('data_tests', {}).get('local_analytics', {}).get('staging', {}).get('+store_failures'); assert v is True, f'+store_failures={v!r}'; print('staging +store_failures=true confirmed')\""]
+    expect_exit_code: 0
+    expect_stdout_match: "staging \\+store_failures=true"
+    points: 20
+
+  - id: parse-success
+    description: "dbt parse が成功する (data_tests: 階層宣言 OK)"
+    type: dbt_command
+    command: ["dbt", "parse"]
+    points: 15
+
+  # ----- 動作チェック (50 点) -----
+
+  - id: staging-tests-inherit-store-failures
+    description: "manifest 上で staging 配下の test に store_failures=true が継承されている (1 個以上)"
+    type: shell_command
+    command: ["bash", "-c", "python3 -c \"import json; m=json.load(open('dbt/target/manifest.json')); ts=[n for n in m['nodes'].values() if n.get('resource_type')=='test' and 'staging' in n.get('fqn',[])]; sf_true=[t for t in ts if t['config'].get('store_failures') is True]; assert len(sf_true) >= 1, f'no staging test has store_failures=True (checked {len(ts)} tests)'; print(f'{len(sf_true)} staging tests with store_failures=true')\""]
+    expect_exit_code: 0
+    expect_stdout_match: "staging tests with store_failures=true"
+    points: 25
+
+  - id: marts-tests-not-inherit-store-failures
+    description: "manifest 上で marts 配下の test には store_failures=true が継承されていない"
+    type: shell_command
+    command: ["bash", "-c", "python3 -c \"import json; m=json.load(open('dbt/target/manifest.json')); ts=[n for n in m['nodes'].values() if n.get('resource_type')=='test' and 'marts' in n.get('fqn',[])]; sf_true=[t for t in ts if t['config'].get('store_failures') is True]; assert len(sf_true) == 0, f'{len(sf_true)} marts tests unexpectedly have store_failures=True'; print(f'marts tests with store_failures=true: 0 (expected)')\""]
+    expect_exit_code: 0
+    expect_stdout_match: "marts tests with store_failures=true: 0"
+    points: 25

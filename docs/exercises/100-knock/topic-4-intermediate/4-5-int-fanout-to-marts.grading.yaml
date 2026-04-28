@@ -1,0 +1,72 @@
+# Grading definition for 100-knock Topic 4, Problem 4-5 (int fan-out to 2 marts).
+# Run by: python scripts/grader/grade.py --grading-file docs/exercises/100-knock/topic-4-intermediate/4-5-int-fanout-to-marts.grading.yaml
+#
+# 採点方針:
+#   - 構造チェック (file_exists × 2, parse, manifest × 2) で 50 点
+#   - lineage チェック (両 mart の direct upstream に int_order_details_100knock = fan-out) で 50 点
+#   - 学習者は mart_daily_sales_100knock.sql + mart_product_sales_100knock.sql をコミット済み
+#
+# 前提:
+#   - 4-1 完了 (int_order_details_100knock が manifest に登録済み)
+#   - dbt parse / dbt run がローカルまたは CI で走る環境
+
+exercise: 100-knock-4-5-int-fanout-to-marts
+title: "100-knock 4-5: int_order_details_100knock を 2 mart から ref する fan-out"
+passing_score: 80
+
+expects_learner_files:
+  - dbt/models/100-knock/topic-4/mart_daily_sales_100knock.sql
+  - dbt/models/100-knock/topic-4/mart_product_sales_100knock.sql
+
+checks:
+  # ----- 構造チェック (50 点) -----
+
+  - id: mart-daily-sales-file-exists
+    description: "dbt/models/100-knock/topic-4/mart_daily_sales_100knock.sql が存在する"
+    type: file_exists
+    path: dbt/models/100-knock/topic-4/mart_daily_sales_100knock.sql
+    points: 10
+
+  - id: mart-product-sales-file-exists
+    description: "dbt/models/100-knock/topic-4/mart_product_sales_100knock.sql が存在する"
+    type: file_exists
+    path: dbt/models/100-knock/topic-4/mart_product_sales_100knock.sql
+    points: 10
+
+  - id: parse-success
+    description: "dbt parse が成功する (両 mart の SQL / Jinja 構文 OK)"
+    type: dbt_command
+    command: ["dbt", "parse"]
+    points: 10
+
+  - id: mart-daily-sales-node-registered
+    description: "manifest に model.local_analytics.mart_daily_sales_100knock が登録されている"
+    type: manifest_node_exists
+    node: model.local_analytics.mart_daily_sales_100knock
+    points: 10
+
+  - id: mart-product-sales-node-registered
+    description: "manifest に model.local_analytics.mart_product_sales_100knock が登録されている"
+    type: manifest_node_exists
+    node: model.local_analytics.mart_product_sales_100knock
+    points: 10
+
+  # ----- lineage チェック (fan-out の検証, 50 点) -----
+
+  - id: mart-daily-sales-refs-int
+    description: "mart_daily_sales_100knock の direct upstream に int_order_details_100knock が含まれる"
+    type: manifest_lineage
+    node: model.local_analytics.mart_daily_sales_100knock
+    upstream_min_count: 1
+    upstream_must_include:
+      - model.local_analytics.int_order_details_100knock
+    points: 25
+
+  - id: mart-product-sales-refs-int
+    description: "mart_product_sales_100knock の direct upstream に int_order_details_100knock が含まれる"
+    type: manifest_lineage
+    node: model.local_analytics.mart_product_sales_100knock
+    upstream_min_count: 1
+    upstream_must_include:
+      - model.local_analytics.int_order_details_100knock
+    points: 25

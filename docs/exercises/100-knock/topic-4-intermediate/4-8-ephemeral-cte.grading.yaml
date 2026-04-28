@@ -1,0 +1,73 @@
+# Grading for 100-knock Topic 4 / Q8: int_order_details_100knock を ephemeral 化、compiled SQL の CTE 展開を確認。
+# Run: python3 scripts/grader/grade.py --grading-file docs/exercises/100-knock/topic-4-intermediate/4-8-ephemeral-cte.grading.yaml
+#
+# 前提: 下流 mart が最低 1 本ある (4-5 で作った mart_*_100knock もしくは
+# 本問 solution の mart_dummy_for_ephemeral)。
+
+exercise: 100-knock-4-8-ephemeral-cte
+title: "4-8: int_order_details_100knock を ephemeral 化、CTE 展開を compiled SQL で確認"
+passing_score: 80
+
+expects_learner_files:
+  - dbt/models/100-knock/topic-4/int_order_details_100knock.sql
+
+checks:
+  - id: model-file-exists
+    description: "int_order_details_100knock.sql が存在する"
+    type: file_exists
+    path: dbt/models/100-knock/topic-4/int_order_details_100knock.sql
+    min_size_bytes: 100
+    points: 10
+
+  - id: dbt-parse-success
+    description: "dbt parse が成功する"
+    type: dbt_command
+    command: ["parse"]
+    points: 15
+
+  - id: model-config-materialized-ephemeral
+    description: "manifest 上 int_order_details_100knock の materialized=ephemeral"
+    type: manifest_config
+    node: model.local_analytics.int_order_details_100knock
+    expected:
+      materialized: ephemeral
+    points: 25
+
+  - id: dbt-compile-with-downstream
+    description: "dbt compile --select int_order_details_100knock+ が成功する"
+    type: dbt_command
+    command: ["compile", "--select", "int_order_details_100knock+"]
+    points: 15
+
+  - id: compiled-downstream-contains-cte
+    description: "下流 mart の compiled SQL に int_order_details_100knock を参照する CTE が含まれる"
+    type: shell_command
+    command: |
+      set -euo pipefail
+      # 4-5 の下流 mart_*_100knock もしくは 4-8 solution の mart_dummy_for_ephemeral を
+      # ターゲットに、compiled SQL の中に CTE 展開を探す。
+      # dbt が自動生成する CTE 名は __dbt__cte__<model_name> 形式。
+      compiled_dir="dbt/target/compiled/local_analytics/models/100-knock"
+      if [ ! -d "$compiled_dir" ]; then
+        echo "compiled dir not found: $compiled_dir"
+        exit 1
+      fi
+      hit=$(grep -rlE '__dbt__cte__int_order_details_100knock|with[[:space:]]+int_order_details_100knock' "$compiled_dir" || true)
+      echo "hits:"
+      echo "$hit"
+      test -n "$hit"
+    points: 25
+
+  - id: no-physical-relation
+    description: "intermediate.int_order_details_100knock が DB 上に物理化されていない (table も view も無い)"
+    type: sql_assert
+    sql: |
+      SELECT count(*)::int
+      FROM pg_class c
+      JOIN pg_namespace n ON c.relnamespace = n.oid
+      WHERE n.nspname = 'intermediate'
+        AND c.relname = 'int_order_details_100knock'
+        AND c.relkind IN ('r', 'v', 'm')
+    op: eq
+    expected: 0
+    points: 10

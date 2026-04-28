@@ -1,0 +1,70 @@
+# Grading for 100-knock Topic 7 / Q10: dbt_project.yml の snapshots: でプロジェクト既定化。
+# Run: python3 scripts/grader/grade.py --grading-file docs/exercises/100-knock/topic-7-snapshot/7-10-snapshots-config.grading.yaml
+#
+# 採点は dbt_project.yml に snapshots: セクションがあること、その既定値が効いて
+# 個別 snapshot ファイルに target_schema を書かなくても dbt が動くこと、を確認する。
+
+exercise: 100-knock-7-10-snapshots-config
+title: "7-10: dbt_project.yml の snapshots: で運用ポリシー既定化"
+passing_score: 80
+
+expects_learner_files:
+  - dbt/dbt_project.yml
+
+checks:
+  - id: project-yml-has-snapshots-section
+    description: "dbt_project.yml に snapshots: セクションが存在する"
+    type: shell_command
+    command: |
+      set -euo pipefail
+      grep -qE '^snapshots:' dbt/dbt_project.yml
+      echo "snapshots: section present"
+    points: 15
+
+  - id: project-yml-has-target-schema-default
+    description: "snapshots: セクションに +target_schema: snapshots がある"
+    type: shell_command
+    command: |
+      set -euo pipefail
+      awk '/^snapshots:/,/^[a-z]/' dbt/dbt_project.yml | grep -qE '\+target_schema:[[:space:]]*snapshots'
+      echo "+target_schema: snapshots default declared"
+    points: 20
+
+  - id: project-yml-has-strategy-default
+    description: "snapshots: セクションに +strategy: check がある"
+    type: shell_command
+    command: |
+      set -euo pipefail
+      awk '/^snapshots:/,/^[a-z]/' dbt/dbt_project.yml | grep -qE '\+strategy:[[:space:]]*check'
+      echo "+strategy: check default declared"
+    points: 15
+
+  - id: dbt-parse-success
+    description: "dbt parse が成功する (snapshots: セクションが正しく解釈される)"
+    type: dbt_command
+    command: ["parse"]
+    points: 20
+
+  - id: snapshot-runs-without-individual-target-schema
+    description: "個別 snapshot ファイルに target_schema を書かなくても dbt snapshot が成功する"
+    type: shell_command
+    command: |
+      set -euo pipefail
+      cd dbt
+      ../.venv/bin/dbt snapshot --profiles-dir . \
+          --select snap_products_100knock --no-colors 2>&1 | tee /tmp/snap-7-10.log >/dev/null
+      grep -qE 'Done\. PASS=1 .*ERROR=0' /tmp/snap-7-10.log
+      echo "snapshot succeeded with project-default target_schema"
+    points: 20
+
+  - id: snapshot-still-in-snapshots-schema
+    description: "結果として snap_products_100knock が snapshots schema に存在する"
+    type: sql_assert
+    sql: |
+      SELECT count(*)::int
+      FROM information_schema.tables
+      WHERE table_schema = 'snapshots'
+        AND table_name   = 'snap_products_100knock'
+    op: eq
+    expected: 1
+    points: 10

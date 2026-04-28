@@ -1,0 +1,61 @@
+# Grading definition for 100-knock Topic 5, Problem 5-3
+# (mart_daily_sales_100knock with contract: enforced + per-column data_type).
+# Run by:
+#   python3 scripts/grader/grade.py \
+#     --grading-file docs/exercises/100-knock/topic-5-mart/5-3-mart-contract-enforced.grading.yaml
+#
+# 採点方針:
+#   - 構造チェック (file_exists / parse / manifest_node) で 30 点
+#   - 契約チェック (manifest_config で contract.enforced=true / dbt run 成功) で 70 点
+#   - 「契約宣言が schema.yml に書かれて、build 時に enforce されているか」を中心に採点
+#
+# 前提:
+#   - dbt 1.5+ (contract: enforced は 1.5 で導入)
+#   - Topic ② ③ ④ 完了
+#   - 学習者は dbt/models/100-knock/topic-5/mart_daily_sales_100knock.sql と
+#     schema.yml に contract 宣言を作成済み
+
+exercise: 100-knock-5-3-mart-contract-enforced
+title: "100-knock 5-3: mart_daily_sales_100knock に contract: enforced + data_type を宣言"
+passing_score: 80
+
+expects_learner_files:
+  - dbt/models/100-knock/topic-5/mart_daily_sales_100knock.sql
+  - dbt/models/100-knock/topic-5/schema.yml
+
+checks:
+  # ----- 構造チェック (30 点) -----
+
+  - id: mart-file-exists
+    description: "dbt/models/100-knock/topic-5/mart_daily_sales_100knock.sql が存在する"
+    type: file_exists
+    path: dbt/models/100-knock/topic-5/mart_daily_sales_100knock.sql
+    points: 10
+
+  - id: parse-success
+    description: "dbt parse が成功する (contract / data_type 構文 OK)"
+    type: dbt_command
+    command: ["dbt", "parse"]
+    points: 10
+
+  - id: mart-node-registered
+    description: "manifest に model.local_analytics.mart_daily_sales_100knock が登録されている"
+    type: manifest_node_exists
+    node: model.local_analytics.mart_daily_sales_100knock
+    points: 10
+
+  # ----- 契約チェック (70 点) -----
+
+  - id: contract-enforced-in-config
+    description: "manifest 上で config.contract.enforced=true が宣言されている (dbt 1.5+ の核心)"
+    type: manifest_config
+    node: model.local_analytics.mart_daily_sales_100knock
+    expected:
+      contract.enforced: true
+    points: 35
+
+  - id: dbt-run-with-contract-passes
+    description: "dbt run --select mart_daily_sales_100knock が成功する (= SQL 出力列と data_type 宣言が一致)"
+    type: dbt_command
+    command: ["dbt", "run", "--select", "mart_daily_sales_100knock"]
+    points: 35

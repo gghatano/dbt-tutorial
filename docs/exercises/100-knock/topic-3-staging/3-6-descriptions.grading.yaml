@@ -1,0 +1,72 @@
+# Grading for 100-knock Topic 3 / Q6: schema.yml に description を model / column 両方に追加。
+# Run: python3 scripts/grader/grade.py --grading-file docs/exercises/100-knock/topic-3-staging/3-6-descriptions.grading.yaml
+
+exercise: 100-knock-3-6-descriptions
+title: "3-6: 全 staging model の schema.yml に description を model / column 両方に書く"
+passing_score: 80
+
+expects_learner_files:
+  - dbt/models/100-knock/topic-3/schema.yml
+
+checks:
+  - id: schema-yml-exists
+    description: "学習者の schema.yml が存在する (3-4 で作成済み想定)"
+    type: file_exists
+    path: dbt/models/100-knock/topic-3/schema.yml
+    points: 10
+
+  - id: description-key-count
+    description: "schema.yml の中に description キーが 20 個以上ある (4 model + 全カラム)"
+    type: shell_command
+    command: |
+      set -euo pipefail
+      n=$(grep -c '^\s*description:' dbt/models/100-knock/topic-3/schema.yml || echo 0)
+      echo "description_key_count=${n}"
+      test "${n}" -ge 20
+    points: 25
+
+  - id: dbt-parse-success
+    description: "dbt parse が成功する (schema.yml が文法的に正しい)"
+    type: dbt_command
+    command: ["parse"]
+    points: 15
+
+  - id: dbt-docs-generate-success
+    description: "dbt docs generate が成功する (manifest + catalog が作成される)"
+    type: dbt_command
+    command: ["docs", "generate"]
+    points: 20
+
+  - id: manifest-model-description-nonempty
+    description: "manifest.json の stg_orders_100knock の model description が非空"
+    type: shell_command
+    command: |
+      set -euo pipefail
+      python3 -c "
+      import json, sys
+      with open('dbt/target/manifest.json') as f:
+          m = json.load(f)
+      node = m['nodes'].get('model.local_analytics.stg_orders_100knock')
+      assert node is not None, 'stg_orders_100knock not in manifest'
+      desc = (node.get('description') or '').strip()
+      print('model_description_len=' + str(len(desc)))
+      assert len(desc) > 0, 'model description is empty'
+      "
+    points: 15
+
+  - id: manifest-column-descriptions-nonempty
+    description: "manifest.json で stg_orders_100knock の主要カラム (order_id / customer_id / order_date) に description がある"
+    type: shell_command
+    command: |
+      set -euo pipefail
+      python3 -c "
+      import json
+      with open('dbt/target/manifest.json') as f:
+          m = json.load(f)
+      node = m['nodes']['model.local_analytics.stg_orders_100knock']
+      cols = node.get('columns', {})
+      missing = [c for c in ('order_id', 'customer_id', 'order_date') if not (cols.get(c, {}).get('description') or '').strip()]
+      print('missing_descriptions=' + repr(missing))
+      assert not missing, 'missing column descriptions: ' + repr(missing)
+      "
+    points: 15

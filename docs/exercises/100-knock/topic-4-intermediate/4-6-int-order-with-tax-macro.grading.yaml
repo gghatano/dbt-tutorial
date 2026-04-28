@@ -1,0 +1,64 @@
+# Grading for 100-knock Topic 4 / Q6: int_order_with_tax_100knock を作り、calc_tax macro を呼ぶ。
+# Run: python3 scripts/grader/grade.py --grading-file docs/exercises/100-knock/topic-4-intermediate/4-6-int-order-with-tax-macro.grading.yaml
+
+exercise: 100-knock-4-6-int-order-with-tax-macro
+title: "4-6: int_order_with_tax_100knock + calc_tax macro で税計算を集約"
+passing_score: 80
+
+expects_learner_files:
+  - dbt/macros/100-knock/topic-4/calc_tax.sql
+  - dbt/models/100-knock/topic-4/int_order_with_tax_100knock.sql
+
+checks:
+  - id: macro-file-exists
+    description: "dbt/macros/100-knock/topic-4/calc_tax.sql が存在する"
+    type: file_exists
+    path: dbt/macros/100-knock/topic-4/calc_tax.sql
+    min_size_bytes: 30
+    points: 15
+
+  - id: model-file-exists
+    description: "dbt/models/100-knock/topic-4/int_order_with_tax_100knock.sql が存在する"
+    type: file_exists
+    path: dbt/models/100-knock/topic-4/int_order_with_tax_100knock.sql
+    min_size_bytes: 80
+    points: 15
+
+  - id: dbt-parse-success
+    description: "dbt parse が成功する (macro / model の構文 OK)"
+    type: dbt_command
+    command: ["parse"]
+    points: 15
+
+  - id: model-node-registered
+    description: "manifest に model.local_analytics.int_order_with_tax_100knock が登録されている"
+    type: manifest_node_exists
+    node: model.local_analytics.int_order_with_tax_100knock
+    points: 15
+
+  - id: model-uses-calc-tax-macro
+    description: "model SQL 中で calc_tax macro を 1 箇所以上呼んでいる"
+    type: shell_command
+    command: |
+      set -euo pipefail
+      n=$(grep -cE 'calc_tax\(' dbt/models/100-knock/topic-4/int_order_with_tax_100knock.sql || echo 0)
+      echo "calc_tax_calls=${n}"
+      test "${n}" -ge 1
+    points: 15
+
+  - id: dbt-run-int-order-with-tax
+    description: "dbt run --select int_order_with_tax_100knock が成功する"
+    type: dbt_command
+    command: ["run", "--select", "int_order_with_tax_100knock"]
+    points: 10
+
+  - id: tax-formula-correct
+    description: "DB 上で sales_amount_with_tax = round(sales_amount * 1.10, 2) が全行で成立 (税込金額の不変条件)"
+    type: sql_assert
+    sql: |
+      SELECT count(*)::int
+      FROM intermediate.int_order_with_tax_100knock
+      WHERE sales_amount_with_tax <> round(sales_amount * 1.10, 2)
+    op: eq
+    expected: 0
+    points: 15

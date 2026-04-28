@@ -1,0 +1,77 @@
+# Grading definition for 100-knock Topic 8, Problem 8-4 (jp_holidays_2026 seed + mart_calendar_sales_100knock).
+# Run by: python scripts/grader/grade.py --grading-file docs/exercises/100-knock/topic-8-reuse/8-4-seed-jp-holidays.grading.yaml
+#
+# 採点方針:
+#   - 構造チェック (file_exists / parse / manifest_node) で 45 点
+#   - 実行チェック (dbt seed + dbt test + sql_assert で行数 16) で 55 点
+#
+# 前提:
+#   - Topic ② 〜 ⑦ 完了 (int_order_details_100knock が物理化済み)
+#   - 学習者が seed CSV + schema.yml + mart SQL を新規作成
+
+exercise: 100-knock-8-4-seed-jp-holidays
+title: "100-knock 8-4: jp_holidays_2026.csv を seed として登録、mart_calendar_sales_100knock に is_holiday 列追加"
+passing_score: 80
+
+expects_learner_files:
+  - dbt/seeds/100-knock/topic-8/jp_holidays_2026.csv
+  - dbt/seeds/100-knock/topic-8/schema.yml
+  - dbt/models/100-knock/topic-8/mart_calendar_sales_100knock.sql
+
+checks:
+  # ----- 構造チェック (45 点) -----
+
+  - id: seed-csv-exists
+    description: "dbt/seeds/100-knock/topic-8/jp_holidays_2026.csv が存在 (ヘッダ + 16 行 ≒ 200 bytes 以上)"
+    type: file_exists
+    path: dbt/seeds/100-knock/topic-8/jp_holidays_2026.csv
+    min_size_bytes: 200
+    points: 10
+
+  - id: seed-schema-yml-exists
+    description: "dbt/seeds/100-knock/topic-8/schema.yml が存在 (seed のテスト宣言)"
+    type: file_exists
+    path: dbt/seeds/100-knock/topic-8/schema.yml
+    min_size_bytes: 100
+    points: 10
+
+  - id: parse-success
+    description: "dbt parse が成功する (seed + mart の構文 OK)"
+    type: dbt_command
+    command: ["parse"]
+    points: 5
+
+  - id: seed-node-registered
+    description: "manifest に seed.local_analytics.jp_holidays_2026 が登録されている"
+    type: manifest_node_exists
+    node: seed.local_analytics.jp_holidays_2026
+    points: 10
+
+  - id: mart-calendar-sales-node-registered
+    description: "manifest に model.local_analytics.mart_calendar_sales_100knock が登録されている"
+    type: manifest_node_exists
+    node: model.local_analytics.mart_calendar_sales_100knock
+    points: 10
+
+  # ----- 実行チェック (55 点) -----
+
+  - id: dbt-seed-success
+    description: "dbt seed --select jp_holidays_2026 が成功する"
+    type: dbt_command
+    command: ["seed", "--select", "jp_holidays_2026"]
+    points: 15
+
+  - id: seed-tests-pass
+    description: "jp_holidays_2026 の test (not_null + unique + accepted_values) が PASS"
+    type: dbt_test_passes
+    select: jp_holidays_2026
+    min_pass: 4
+    points: 20
+
+  - id: seed-row-count-16
+    description: "staging.jp_holidays_2026 が 16 行 (2026 年祝日 16 日)"
+    type: sql_assert
+    sql: "SELECT count(*)::int FROM staging.jp_holidays_2026"
+    op: eq
+    expected: 16
+    points: 20

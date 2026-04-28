@@ -1,0 +1,75 @@
+# Grading definition for Exercise 09 (on-run-end hook で grants 自動化).
+# Run by: python scripts/grader/grade.py --exercise 09
+#
+# 採点方針:
+#   - 構造チェック (file_exists / parse) で 35 点
+#   - 動作チェック (dbt run + grant 結果の SQL 検証) で 65 点
+#   - hook が実際に走ったかは psql 側から has_table_privilege() で判定する
+#     (dbt run のログ文字列を grep するより堅い)
+#
+# 前提 / 注意:
+#   - 本演習は dbt/dbt_project.yml を直接編集する。grader は学習者が
+#     「on-run-end フック追加済みの dbt_project.yml」をコミットしている前提で動く。
+#     コミットせずに run 結果だけ残しても、CI では再現できない点に注意。
+#   - mart_test_grant_visibility model (dbt/models/exercises/09/) も学習者が作る。
+#     これがないと on-run-end hook 自体は走るが「新マートに grant が効くか」の
+#     観点が確認できないため、テスト用 mart の存在も file_exists で確認する。
+#   - sql_assert は readonly_user の SELECT 権限を has_table_privilege() で検査する。
+#     grader 実行時、DSN は dbt_user 相当だが has_table_privilege は他ユーザに
+#     対するクエリも投げられるため問題ない。
+#   - target.name == 'dev' ガードのため、CI も dev target で実行されている前提。
+
+exercise: 09-hooks-and-grants
+title: "Exercise 09: on-run-end hook で grants を自動化する"
+passing_score: 80   # need >= 80% of total points to PASS
+
+expects_learner_files:
+  - dbt/macros/grant_select_on_marts.sql
+  - dbt/models/exercises/09/mart_test_grant_visibility.sql
+  # dbt/dbt_project.yml は MVP に既に存在するので新規ではないが、
+  # on-run-end フックを追記する必要がある。
+
+checks:
+  # ----- 構造チェック (35点) -----
+
+  - id: parse-success
+    description: "dbt parse が成功する (on-run-end フック + macro の構文 OK)"
+    type: dbt_command
+    command: ["dbt", "parse"]
+    points: 10
+
+  - id: grant-macro-file-exists
+    description: "dbt/macros/grant_select_on_marts.sql が存在する"
+    type: file_exists
+    path: dbt/macros/grant_select_on_marts.sql
+    points: 15
+
+  - id: test-mart-model-exists
+    description: "dbt/models/exercises/09/mart_test_grant_visibility.sql が存在する (grant 検証用 mart)"
+    type: file_exists
+    path: dbt/models/exercises/09/mart_test_grant_visibility.sql
+    points: 10
+
+  # ----- 動作チェック (65点): dbt run → on-run-end が走り grant が反映されたか -----
+
+  - id: dbt-run-test-mart
+    description: "dbt run --select mart_test_grant_visibility が成功する (on-run-end hook 込み)"
+    type: dbt_command
+    command: ["dbt", "run", "--select", "mart_test_grant_visibility"]
+    points: 20
+
+  - id: readonly-can-select-test-mart
+    description: "on-run-end hook 後、readonly_user が新マート mart_test_grant_visibility に SELECT 権限を持つ"
+    type: sql_assert
+    sql: "SELECT has_table_privilege('readonly_user', 'marts.mart_test_grant_visibility', 'SELECT')::int"
+    op: eq
+    expected: 1
+    points: 25
+
+  - id: readonly-can-select-existing-mart
+    description: "on-run-end hook が MVP 既存 mart (mart_daily_sales) にも grant を再発行している"
+    type: sql_assert
+    sql: "SELECT has_table_privilege('readonly_user', 'marts.mart_daily_sales', 'SELECT')::int"
+    op: eq
+    expected: 1
+    points: 20

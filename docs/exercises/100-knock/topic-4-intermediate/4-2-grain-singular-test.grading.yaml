@@ -1,0 +1,57 @@
+# Grading definition for 100-knock Topic 4, Problem 4-2 (singular test for grain).
+# Run by: python scripts/grader/grade.py --grading-file docs/exercises/100-knock/topic-4-intermediate/4-2-grain-singular-test.grading.yaml
+#
+# 採点方針:
+#   - 構造チェック (file_exists / parse / manifest_node_exists) で 45 点
+#   - データチェック (dbt_test_passes / sql_assert) で 55 点
+#   - 学習者は dbt/tests/100-knock/topic-4/assert_int_order_details_grain.sql をコミット済み
+#
+# 前提:
+#   - 4-1 完了 (int_order_details_100knock が物理化済み)
+#   - 学習者は singular test SQL を作成
+#   - dbt parse / dbt test がローカルまたは CI で走る環境
+
+exercise: 100-knock-4-2-grain-singular-test
+title: "100-knock 4-2: grain 違反を検知する singular test を書く"
+passing_score: 80
+
+expects_learner_files:
+  - dbt/tests/100-knock/topic-4/assert_int_order_details_grain.sql
+
+checks:
+  # ----- 構造チェック (45 点) -----
+
+  - id: singular-test-file-exists
+    description: "dbt/tests/100-knock/topic-4/assert_int_order_details_grain.sql が存在する"
+    type: file_exists
+    path: dbt/tests/100-knock/topic-4/assert_int_order_details_grain.sql
+    points: 15
+
+  - id: parse-success
+    description: "dbt parse が成功する (singular test の SQL 構文 OK)"
+    type: dbt_command
+    command: ["dbt", "parse"]
+    points: 15
+
+  - id: singular-test-node-registered
+    description: "manifest に test.local_analytics.assert_int_order_details_grain が登録されている (= ref() 経由で書かれて DAG の市民権を持つ)"
+    type: manifest_node_exists
+    node: test.local_analytics.assert_int_order_details_grain
+    points: 15
+
+  # ----- データチェック (55 点) -----
+
+  - id: singular-test-passes
+    description: "dbt test --select assert_int_order_details_grain が PASS (grain 違反 0 件)"
+    type: dbt_test_passes
+    select: assert_int_order_details_grain
+    min_pass: 1
+    points: 30
+
+  - id: grain-actually-unique-via-sql
+    description: "psql で int_order_details_100knock の order_id 重複が 0 件 (grain がデータ上も守られている)"
+    type: sql_assert
+    sql: "SELECT count(*) FROM (SELECT order_id FROM intermediate.int_order_details_100knock GROUP BY order_id HAVING count(*) > 1) t"
+    op: eq
+    expected: 0
+    points: 25

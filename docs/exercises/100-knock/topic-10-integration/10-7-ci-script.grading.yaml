@@ -1,0 +1,76 @@
+# Grading definition for 100-knock Topic 10, Problem 10-7
+# (CI 1-line script: dbt deps + source freshness + build state:modified+ --defer)
+# Run by:
+#   python3 scripts/grader/grade.py \
+#     --grading-file docs/exercises/100-knock/topic-10-integration/10-7-ci-script.grading.yaml
+#
+# 採点方針:
+#   - file_exists + 構文チェック (bash -n) で 30 点
+#   - 必須キーワード grep (dbt deps / source freshness / dbt build / state:modified+ / --defer / --state) で 50 点
+#   - set -euo pipefail / shebang などのガード で 20 点
+
+exercise: 100-knock-10-7-ci-script
+title: "100-knock 10-7: CI 1 行コマンド (dbt deps + freshness + build state:modified+ --defer) を script 化"
+passing_score: 80
+
+expects_learner_files:
+  - scripts/100-knock/topic-10/ci/dbt_check.sh
+
+checks:
+  # ----- file 存在 + 構文 (30 点) -----
+
+  - id: ci-script-exists
+    description: "scripts/100-knock/topic-10/ci/dbt_check.sh が存在する"
+    type: file_exists
+    path: scripts/100-knock/topic-10/ci/dbt_check.sh
+    min_size_bytes: 100
+    points: 15
+
+  - id: ci-script-syntax-ok
+    description: "bash -n で構文チェックが通る"
+    type: shell_command
+    command: |
+      set -euo pipefail
+      bash -n scripts/100-knock/topic-10/ci/dbt_check.sh
+      echo "syntax ok"
+    points: 15
+
+  # ----- 必須キーワード (50 点) -----
+
+  - id: ci-script-has-three-dbt-commands
+    description: "script に 'dbt deps' / 'dbt source freshness' / 'dbt build' の 3 コマンドが含まれている"
+    type: shell_command
+    command: |
+      set -euo pipefail
+      grep -q 'dbt deps' scripts/100-knock/topic-10/ci/dbt_check.sh
+      grep -q 'dbt source freshness' scripts/100-knock/topic-10/ci/dbt_check.sh
+      grep -q 'dbt build' scripts/100-knock/topic-10/ci/dbt_check.sh
+    points: 30
+
+  - id: ci-script-has-state-modified-and-defer
+    description: "script に '--select state:modified+' および '--defer' '--state' のフラグが含まれている"
+    type: shell_command
+    command: |
+      set -euo pipefail
+      grep -q 'state:modified+' scripts/100-knock/topic-10/ci/dbt_check.sh
+      grep -q -- '--defer' scripts/100-knock/topic-10/ci/dbt_check.sh
+      grep -q -- '--state' scripts/100-knock/topic-10/ci/dbt_check.sh
+    points: 20
+
+  # ----- ガード (20 点) -----
+
+  - id: ci-script-has-set-eu-pipefail
+    description: "script に 'set -e' / 'pipefail' のガードがある (タイポ防止)"
+    type: shell_command
+    command: |
+      set -euo pipefail
+      grep -qE 'set -e|set -.*e.*|pipefail' scripts/100-knock/topic-10/ci/dbt_check.sh
+    points: 10
+
+  - id: ci-script-has-shebang
+    description: "script の 1 行目が #!/usr/bin/env bash または #!/bin/bash"
+    type: shell_command
+    command: |
+      set -euo pipefail
+      head -n 1 scripts/100-knock/topic-10/ci/dbt_check.sh | grep -qE '^#!.*(bash|sh)$|^#!.*bash'
+    points: 10

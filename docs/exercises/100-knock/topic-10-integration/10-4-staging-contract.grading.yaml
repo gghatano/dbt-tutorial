@@ -1,0 +1,71 @@
+# Grading for 100-knock Topic 10 / Q4: staging に contract: enforced + data_type 全列宣言
+# Run: python3 scripts/grader/grade.py --grading-file docs/exercises/100-knock/topic-10-integration/10-4-staging-contract.grading.yaml
+#
+# 採点方針:
+#   - file_exists で staging SQL + schema.yml の存在 (15)
+#   - dbt_command parse 通過 (15)
+#   - manifest_config で contract.enforced = true (30)
+#   - shell_command で schema.yml の全列に data_type が宣言されているかチェック (25)
+#   - shell_command で staging SQL に config(contract=...) が含まれる (15)
+#   合計 100、合格 80。
+#
+# 注:
+#   - 「Contract Error で run が落ちる」体験は raw 物理テーブル無しでは検証困難なので、
+#     宣言の正しさ (contract.enforced + 全列 data_type) で代替採点。
+#   - 学習者が log を残した場合は 10-8 で再評価。
+
+exercise: 100-knock-10-4-staging-contract
+title: "10-4: staging に contract: enforced (1.5+) + 全列 data_type を宣言"
+passing_score: 80
+
+expects_learner_files:
+  - dbt/models/100-knock/topic-10/stg_subscriptions_100knock.sql
+  - dbt/models/100-knock/topic-10/schema.yml
+
+checks:
+  - id: stg-sql-exists
+    description: "stg_subscriptions_100knock.sql が存在し 100 bytes 以上"
+    type: file_exists
+    path: dbt/models/100-knock/topic-10/stg_subscriptions_100knock.sql
+    min_size_bytes: 100
+    points: 7
+
+  - id: schema-yml-exists
+    description: "schema.yml が存在し 200 bytes 以上"
+    type: file_exists
+    path: dbt/models/100-knock/topic-10/schema.yml
+    min_size_bytes: 200
+    points: 8
+
+  - id: dbt-parse-success
+    description: "dbt parse が成功 (config/contract の構文 OK)"
+    type: dbt_command
+    command: ["dbt", "parse"]
+    points: 15
+
+  - id: contract-enforced-in-config
+    description: "manifest 上で stg_subscriptions_100knock の config.contract.enforced=true"
+    type: manifest_config
+    node: model.local_analytics.stg_subscriptions_100knock
+    expected:
+      contract.enforced: true
+    points: 30
+
+  - id: stg-sql-contains-contract-config
+    description: "stg SQL ファイルに contract={'enforced': true} (or 同等) を含む config() がある"
+    type: shell_command
+    command: |
+      set -euo pipefail
+      f=dbt/models/100-knock/topic-10/stg_subscriptions_100knock.sql
+      # config() ブロック中に contract と enforced の両方が出現することを確認
+      grep -E "contract" "${f}" >/dev/null
+      grep -E "enforced" "${f}" >/dev/null
+    points: 15
+
+  - id: schema-yml-all-columns-have-data-type
+    description: "stg_subscriptions_100knock の schema.yml の columns 全列に data_type が付与されている (yaml.safe_load で確認)"
+    type: shell_command
+    command: |
+      set -euo pipefail
+      python3 -c 'import yaml,sys; doc=yaml.safe_load(open("dbt/models/100-knock/topic-10/schema.yml")); m=next((x for x in doc.get("models",[]) if x.get("name")=="stg_subscriptions_100knock"), None); assert m, "stg_subscriptions_100knock not found"; cols=m.get("columns",[]); assert len(cols)>=5, f"too few cols: {len(cols)}"; missing=[c.get("name") for c in cols if not c.get("data_type")]; assert not missing, f"cols without data_type: {missing}"; print(f"OK: all {len(cols)} columns have data_type")'
+    points: 25

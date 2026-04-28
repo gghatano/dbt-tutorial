@@ -1,0 +1,92 @@
+# Grading definition for 100-knock Topic 10, Problem 10-9 (open-ended)
+# (Peer / future-self DAG review with 3 categories: 依存方向 / 命名 / 影響範囲)
+# Run by:
+#   python3 scripts/grader/grade.py \
+#     --grading-file docs/exercises/100-knock/topic-10-integration/10-9-peer-review.grading.yaml
+#
+# 採点方針 (open-ended 問の方針):
+#   - 「書かれていれば部分点」、内容質より仕組み
+#   - 評価は人手前提、CI は形式のみ確認
+#   - file_exists + 必須セクション grep + 各セクション >= 100 文字 の機械的チェック
+
+exercise: 100-knock-10-9-peer-review
+title: "100-knock 10-9 (open-ended): ペア (or 将来の自分) の DAG をレビューし feedback.md を書く"
+passing_score: 80
+
+expects_learner_files:
+  - docs/exercises/100-knock/topic-10-integration/learner/design_review_feedback.md
+
+checks:
+  # ----- file 存在 + 最低サイズ (15 点) -----
+
+  - id: feedback-md-exists
+    description: "learner/design_review_feedback.md が存在する (最低 300 byte)"
+    type: file_exists
+    path: docs/exercises/100-knock/topic-10-integration/learner/design_review_feedback.md
+    min_size_bytes: 300
+    points: 15
+
+  # ----- 必須セクション 3 つの見出し grep (30 点) -----
+
+  - id: section-dependency-direction
+    description: "## 依存方向 の見出しがある"
+    type: shell_command
+    command: |
+      set -euo pipefail
+      grep -qE '^##.*依存方向' docs/exercises/100-knock/topic-10-integration/learner/design_review_feedback.md
+    points: 10
+
+  - id: section-naming
+    description: "## 命名 の見出しがある"
+    type: shell_command
+    command: |
+      set -euo pipefail
+      grep -qE '^##.*命名' docs/exercises/100-knock/topic-10-integration/learner/design_review_feedback.md
+    points: 10
+
+  - id: section-impact-scope
+    description: "## 影響範囲 の見出しがある"
+    type: shell_command
+    command: |
+      set -euo pipefail
+      grep -qE '^##.*影響範囲' docs/exercises/100-knock/topic-10-integration/learner/design_review_feedback.md
+    points: 10
+
+  # ----- 各セクション本文 >= 100 文字 (45 点) -----
+
+  - id: dependency-section-100chars
+    description: "依存方向セクションの本文が 100 文字以上"
+    type: shell_command
+    command: |
+      set -euo pipefail
+      f=docs/exercises/100-knock/topic-10-integration/learner/design_review_feedback.md
+      # 依存方向 見出しから次の H2 までを抽出して文字数カウント
+      body=$(awk '/^##.*依存方向/{flag=1; next} /^##/{flag=0} flag' "$f")
+      n=$(echo "$body" | wc -m | tr -d ' ')
+      echo "dependency_section_chars=${n}"
+      test "${n}" -ge 100
+    points: 15
+
+  - id: naming-section-100chars
+    description: "命名セクションの本文が 100 文字以上"
+    type: shell_command
+    command: |
+      set -euo pipefail
+      f=docs/exercises/100-knock/topic-10-integration/learner/design_review_feedback.md
+      body=$(awk '/^##.*命名/{flag=1; next} /^##/{flag=0} flag' "$f")
+      n=$(echo "$body" | wc -m | tr -d ' ')
+      echo "naming_section_chars=${n}"
+      test "${n}" -ge 100
+    points: 15
+
+  - id: impact-section-100chars
+    description: "影響範囲セクションの本文が 100 文字以上"
+    type: shell_command
+    command: |
+      set -euo pipefail
+      f=docs/exercises/100-knock/topic-10-integration/learner/design_review_feedback.md
+      body=$(awk '/^##.*影響範囲/{flag=1; next} /^##/{flag=0} flag' "$f")
+      n=$(echo "$body" | wc -m | tr -d ' ')
+      echo "impact_section_chars=${n}"
+      test "${n}" -ge 100
+    points: 25

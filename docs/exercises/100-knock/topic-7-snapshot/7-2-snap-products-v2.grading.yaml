@@ -1,0 +1,71 @@
+# Grading definition for 100-knock Topic 7, Problem 7-2 (v2 load + 2nd snapshot).
+# Run by: python scripts/grader/grade.py --grading-file docs/exercises/100-knock/topic-7-snapshot/7-2-snap-products-v2.grading.yaml
+#
+# 採点方針:
+#   - 学習者が書いた v2 ロード script を実行 (shell_command)
+#   - その後 2 回目の dbt snapshot を実行 (shell_command)
+#   - 結果として snapshots.snap_products_100knock が 120 行になることを検証 (sql_assert ×3)
+#
+# 前提:
+#   - 7-1 完了 (snap_products_100knock.sql コミット済み, 1 回目 snapshot で 100 行)
+#   - data/exercises/inbox/products_v2.csv が存在
+#     (CI 側で `python scripts/exercises/generate_04_price_update.py` を事前実行)
+#   - 学習者が scripts/100-knock/topic-7/load_products_v2.py を作成
+
+exercise: 100-knock-7-2-snap-products-v2
+title: "100-knock 7-2: v2 を流し込んで履歴 v1+v2 を確認"
+passing_score: 80
+
+expects_learner_files:
+  - scripts/100-knock/topic-7/load_products_v2.py
+
+checks:
+  # ----- 構造チェック (15 点) -----
+
+  - id: load-script-exists
+    description: "scripts/100-knock/topic-7/load_products_v2.py が存在する"
+    type: file_exists
+    path: scripts/100-knock/topic-7/load_products_v2.py
+    points: 15
+
+  # ----- 実行チェック (45 点) -----
+
+  - id: load-v2-success
+    description: "load_products_v2.py が成功し、raw.products が 100 行で再ロードされる"
+    type: shell_command
+    command: ["bash", "-c", "set -a; source .env; set +a; .venv/bin/python scripts/100-knock/topic-7/load_products_v2.py"]
+    expect_stdout_match: "(refreshed|100 rows)"
+    points: 20
+
+  - id: snap-2nd-run-success
+    description: "2 回目の dbt snapshot --select snap_products_100knock が成功する"
+    type: shell_command
+    command: ["bash", "-c", "cd dbt && ../.venv/bin/dbt snapshot --profiles-dir . --select snap_products_100knock"]
+    expect_stdout_match: "PASS=1"
+    points: 25
+
+  # ----- データチェック (40 点) -----
+
+  - id: snap-row-count-120
+    description: "snapshots.snap_products_100knock が 120 行ある (v1 100 + v2 20)"
+    type: sql_assert
+    sql: "SELECT count(*)::int FROM snapshots.snap_products_100knock"
+    op: eq
+    expected: 120
+    points: 15
+
+  - id: snap-active-count-100
+    description: "dbt_valid_to IS NULL の行 (最新行) が 100 行ある"
+    type: sql_assert
+    sql: "SELECT count(*)::int FROM snapshots.snap_products_100knock WHERE dbt_valid_to IS NULL"
+    op: eq
+    expected: 100
+    points: 15
+
+  - id: snap-expired-count-20
+    description: "dbt_valid_to IS NOT NULL の行 (旧版) が 20 行ある"
+    type: sql_assert
+    sql: "SELECT count(*)::int FROM snapshots.snap_products_100knock WHERE dbt_valid_to IS NOT NULL"
+    op: eq
+    expected: 20
+    points: 10

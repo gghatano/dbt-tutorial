@@ -1,0 +1,51 @@
+# Grading definition for Exercise 01 (顧客レビューの取り込み).
+# Run by: python scripts/grader/grade.py --exercise 01
+
+exercise: 01-ingest-reviews
+title: "Exercise 01: 顧客レビューの取り込み"
+passing_score: 80   # need >= 80% of total points to PASS
+
+# Files the learner is expected to create (UX hint only — actual enforcement
+# happens in `checks` below).
+expects_learner_files:
+  - dbt/models/exercises/01/sources.yml
+  - dbt/models/exercises/01/stg_reviews.sql
+  - dbt/models/exercises/01/schema.yml
+
+checks:
+  # ----- structural (manifest-only, no DB needed) -----
+
+  - id: parse-success
+    description: "dbt parse が成功する (構文 OK)"
+    type: dbt_command
+    command: ["dbt", "parse"]
+    points: 10
+
+  - id: stg-reviews-file-exists
+    description: "dbt/models/exercises/01/stg_reviews.sql が存在する"
+    type: file_exists
+    path: dbt/models/exercises/01/stg_reviews.sql
+    points: 10
+
+  - id: stg-reviews-node-registered
+    description: "manifest に model.local_analytics.stg_reviews が登録されている"
+    type: manifest_node_exists
+    node: model.local_analytics.stg_reviews
+    points: 20
+
+  # ----- data-level (requires DB + dbt build done) -----
+
+  - id: stg-reviews-tests-pass
+    description: "dbt test --select stg_reviews が全件 PASS (not_null/unique/relationships/accepted_values)"
+    type: dbt_test_passes
+    select: stg_reviews
+    min_pass: 5
+    points: 30
+
+  - id: stg-reviews-row-count
+    description: "staging.stg_reviews が 2000 行ある (CSV 由来の生成データ)"
+    type: sql_assert
+    sql: "SELECT count(*) FROM staging.stg_reviews"
+    op: eq
+    expected: 2000
+    points: 30

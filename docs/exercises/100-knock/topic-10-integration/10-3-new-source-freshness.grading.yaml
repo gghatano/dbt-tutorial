@@ -1,0 +1,85 @@
+# Grading for 100-knock Topic 10 / Q3: 新規 source + freshness 宣言
+# Run: python3 scripts/grader/grade.py --grading-file docs/exercises/100-knock/topic-10-integration/10-3-new-source-freshness.grading.yaml
+#
+# 採点方針:
+#   - file_exists で sources.yml の存在 (10)
+#   - shell_command で必須キー (freshness / loaded_at_field / warn_after / error_after) を grep (50)
+#   - shell_command でテーブル 2 本以上の宣言を確認 (15)
+#   - dbt_command で parse 通過 (25)
+#   合計 100、合格 80。
+#
+# 注:
+#   - dbt source freshness の実行は raw に物理テーブルが無いと落ちるので採点しない。
+#   - 「宣言が正しく書かれていれば部分点」が方針 (Topic ⑩ の運用思想)。
+
+exercise: 100-knock-10-3-new-source-freshness
+title: "10-3: 新規 source を sources.yml に追加し description / loaded_at_field / freshness を宣言"
+passing_score: 80
+
+expects_learner_files:
+  - dbt/models/100-knock/topic-10/sources.yml
+
+checks:
+  - id: sources-yml-exists
+    description: "dbt/models/100-knock/topic-10/sources.yml が存在し、内容が 200 bytes 以上ある"
+    type: file_exists
+    path: dbt/models/100-knock/topic-10/sources.yml
+    min_size_bytes: 200
+    points: 10
+
+  - id: contains-freshness
+    description: "sources.yml に freshness: キーが含まれる"
+    type: shell_command
+    command: |
+      set -euo pipefail
+      grep -E '^\s*freshness:' dbt/models/100-knock/topic-10/sources.yml >/dev/null
+    points: 15
+
+  - id: contains-loaded-at-field
+    description: "sources.yml に loaded_at_field: キーが含まれる"
+    type: shell_command
+    command: |
+      set -euo pipefail
+      grep -E '^\s*loaded_at_field:' dbt/models/100-knock/topic-10/sources.yml >/dev/null
+    points: 10
+
+  - id: contains-warn-after
+    description: "sources.yml に warn_after: キーが含まれる"
+    type: shell_command
+    command: |
+      set -euo pipefail
+      grep -E 'warn_after' dbt/models/100-knock/topic-10/sources.yml >/dev/null
+    points: 10
+
+  - id: contains-error-after
+    description: "sources.yml に error_after: キーが含まれる"
+    type: shell_command
+    command: |
+      set -euo pipefail
+      grep -E 'error_after' dbt/models/100-knock/topic-10/sources.yml >/dev/null
+    points: 10
+
+  - id: contains-min-2-tables
+    description: "sources.yml に 2 つ以上の table 定義が含まれる (- name: <table> 行が 3 行以上 = source 1 + tables 2)"
+    type: shell_command
+    command: |
+      set -euo pipefail
+      f=dbt/models/100-knock/topic-10/sources.yml
+      n=$(grep -cE '^\s*-\s*name:\s*' "${f}" || echo 0)
+      echo "name_entries=${n}"
+      test "${n}" -ge 3
+    points: 15
+
+  - id: contains-source-description
+    description: "sources.yml に description: キーが少なくとも 1 つ含まれる"
+    type: shell_command
+    command: |
+      set -euo pipefail
+      grep -E '^\s*description:' dbt/models/100-knock/topic-10/sources.yml >/dev/null
+    points: 5
+
+  - id: dbt-parse-success
+    description: "dbt parse が成功 (新規 sources.yml の構文 OK + 既存 100-knock を壊していない)"
+    type: dbt_command
+    command: ["dbt", "parse"]
+    points: 25

@@ -1,0 +1,98 @@
+# Grading for 100-knock Topic 10 / Q1: 新規ドメインの要件定義 1 ページを書く
+# Run: python3 scripts/grader/grade.py --grading-file docs/exercises/100-knock/topic-10-integration/10-1-requirements.grading.yaml
+#
+# 採点方針:
+#   - file_exists で「書かれたか」を確認 (15)
+#   - shell_command + grep で必須セクション (ステークホルダー/KPI/mart/SLA) の出現を確認 (40)
+#   - shell_command で文字数 >= 800 を確認 (25)
+#   - shell_command で KPI 3 つ / mart 3 本の箇条書きカウント (20)
+#   合計 100、合格 80。open-ended 問なので「書かれていれば部分点」が基本方針。
+
+exercise: 100-knock-10-1-requirements
+title: "10-1: 新規ドメインの要件定義を 1 ページにまとめる"
+passing_score: 80
+
+expects_learner_files:
+  - docs/exercises/100-knock/topic-10-integration/learner/requirements.md
+
+checks:
+  # ----- ファイル存在 (15) -----
+
+  - id: requirements-md-exists
+    description: "learner/requirements.md が存在し、内容が 200 bytes 以上ある"
+    type: file_exists
+    path: docs/exercises/100-knock/topic-10-integration/learner/requirements.md
+    min_size_bytes: 200
+    points: 15
+
+  # ----- 必須セクション 4 つの存在 (40) -----
+
+  - id: section-stakeholders
+    description: "「ステークホルダー」セクションが含まれる"
+    type: shell_command
+    command: |
+      set -euo pipefail
+      grep -E 'ステークホルダー|stakeholder' docs/exercises/100-knock/topic-10-integration/learner/requirements.md >/dev/null
+    points: 10
+
+  - id: section-kpi
+    description: "「KPI」セクションが含まれる"
+    type: shell_command
+    command: |
+      set -euo pipefail
+      grep -E 'KPI|kpi' docs/exercises/100-knock/topic-10-integration/learner/requirements.md >/dev/null
+    points: 10
+
+  - id: section-mart
+    description: "「mart」セクションが含まれる (mart_xxx の宣言)"
+    type: shell_command
+    command: |
+      set -euo pipefail
+      grep -iE 'mart' docs/exercises/100-knock/topic-10-integration/learner/requirements.md >/dev/null
+    points: 10
+
+  - id: section-sla
+    description: "「SLA」セクションが含まれる"
+    type: shell_command
+    command: |
+      set -euo pipefail
+      grep -E 'SLA|sla|鮮度|freshness' docs/exercises/100-knock/topic-10-integration/learner/requirements.md >/dev/null
+    points: 10
+
+  # ----- 文字数 (25) -----
+
+  - id: requirements-min-length
+    description: "本文が 800 文字以上 (実体ある分量)"
+    type: shell_command
+    command: |
+      set -euo pipefail
+      f=docs/exercises/100-knock/topic-10-integration/learner/requirements.md
+      n=$(wc -m < "${f}" | tr -d ' ')
+      echo "char_count=${n}"
+      test "${n}" -ge 800
+    points: 25
+
+  # ----- KPI / mart の数を確認 (20) -----
+
+  - id: kpi-three-items
+    description: "KPI 3 つ以上が箇条書き or 番号付きリストで列挙されている"
+    type: shell_command
+    command: |
+      set -euo pipefail
+      f=docs/exercises/100-knock/topic-10-integration/learner/requirements.md
+      # KPI セクション以降の `- ` または `1.` 行を数える (KPI / mart 両方を含むので緩めに)
+      n=$(grep -cE '^\s*([-*]|[0-9]+\.)\s+' "${f}" || echo 0)
+      echo "list_items=${n}"
+      test "${n}" -ge 3
+    points: 10
+
+  - id: mart-three-items
+    description: "提案 mart 3 本以上の言及 (mart_ で始まる identifier が 3 個以上 unique 出現)"
+    type: shell_command
+    command: |
+      set -euo pipefail
+      f=docs/exercises/100-knock/topic-10-integration/learner/requirements.md
+      n=$(grep -oE 'mart_[a-z0-9_]+' "${f}" | sort -u | wc -l | tr -d ' ')
+      echo "unique_mart_count=${n}"
+      test "${n}" -ge 3
+    points: 10

@@ -1,0 +1,80 @@
+# Grading definition for 100-knock Topic 8, Problem 8-2 (dbt-utils + generate_surrogate_key).
+# Run by: python scripts/grader/grade.py --grading-file docs/exercises/100-knock/topic-8-reuse/8-2-dbt-utils-surrogate.grading.yaml
+#
+# 採点方針:
+#   - 構造チェック (file_exists / shell grep / parse) で 50 点
+#   - 実行チェック (dbt run + dbt test PASS + sql_assert で md5 長 32) で 50 点
+#
+# 前提:
+#   - Topic ② 〜 ⑦ 完了 (int_customer_daily_100knock が物理化済み)
+#   - 学習者が packages.yml に dbt-labs/dbt_utils を追加済み
+#   - CI workflow が dbt deps を回して dbt_packages/dbt_utils/ を展開済み
+
+exercise: 100-knock-8-2-dbt-utils-surrogate
+title: "100-knock 8-2: dbt-utils を packages.yml に追加、generate_surrogate_key で複合代理キーを 1 列化"
+passing_score: 80
+
+expects_learner_files:
+  - dbt/packages.yml
+  - dbt/models/100-knock/topic-4/int_customer_daily_100knock.sql
+  - dbt/models/100-knock/topic-4/schema.yml
+
+checks:
+  # ----- 構造チェック (50 点) -----
+
+  - id: packages-yml-has-dbt-utils
+    description: "dbt/packages.yml に dbt-labs/dbt_utils が宣言されている"
+    type: shell_command
+    command: |
+      set -euo pipefail
+      grep -E 'dbt-labs/dbt_utils' dbt/packages.yml >/dev/null
+      echo "dbt_utils_declared"
+    points: 10
+
+  - id: dbt-utils-installed
+    description: "dbt deps 後、dbt/dbt_packages/dbt_utils/dbt_project.yml が存在する"
+    type: file_exists
+    path: dbt/dbt_packages/dbt_utils/dbt_project.yml
+    points: 15
+
+  - id: parse-success
+    description: "dbt parse が成功する (dbt_utils macro 解決を含む)"
+    type: dbt_command
+    command: ["parse"]
+    points: 10
+
+  - id: model-uses-generate-surrogate-key
+    description: "int_customer_daily_100knock.sql 内で dbt_utils.generate_surrogate_key を呼んでいる"
+    type: shell_command
+    command: |
+      set -euo pipefail
+      grep -E 'dbt_utils\.generate_surrogate_key\(' \
+        dbt/models/100-knock/topic-4/int_customer_daily_100knock.sql >/dev/null
+      echo "generate_surrogate_key_used"
+    points: 15
+
+  # ----- 実行チェック (50 点) -----
+
+  - id: dbt-run-int-customer-daily
+    description: "dbt run --select int_customer_daily_100knock が成功"
+    type: dbt_command
+    command: ["run", "--select", "int_customer_daily_100knock"]
+    points: 10
+
+  - id: customer-day-key-tests-pass
+    description: "int_customer_daily_100knock の test (customer_day_key not_null + unique 含む) が PASS"
+    type: dbt_test_passes
+    select: int_customer_daily_100knock
+    min_pass: 2
+    points: 20
+
+  - id: customer-day-key-md5-length-32
+    description: "customer_day_key 列の長さが全行 32 文字 (md5 hex digest)"
+    type: sql_assert
+    sql: |
+      SELECT count(*)::int
+      FROM intermediate.int_customer_daily_100knock
+      WHERE length(customer_day_key) <> 32 OR customer_day_key IS NULL
+    op: eq
+    expected: 0
+    points: 20

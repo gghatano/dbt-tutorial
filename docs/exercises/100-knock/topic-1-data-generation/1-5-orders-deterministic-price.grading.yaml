@@ -1,0 +1,107 @@
+# Grading definition for 100-knock Topic 1, Problem 1-5
+# (orders.unit_price deterministic from product_id).
+# Run by: python scripts/grader/grade.py --grading-file docs/exercises/100-knock/topic-1-data-generation/1-5-orders-deterministic-price.grading.yaml
+
+exercise: 100-knock-1-5-orders-deterministic-price
+title: "100-knock 1-5: orders.unit_price を product_id から決定論的に算出"
+passing_score: 80   # need >= 80% of total points to PASS
+
+expects_learner_files:
+  - scripts/100-knock/topic-1/generate_1_05_orders.py
+
+checks:
+  # ----- structural -----
+
+  - id: script-exists
+    description: "scripts/100-knock/topic-1/generate_1_05_orders.py が存在する"
+    type: file_exists
+    path: scripts/100-knock/topic-1/generate_1_05_orders.py
+    points: 10
+
+  - id: run-generator
+    description: "スクリプトが exit 0 で完了し orders.csv が出力される"
+    type: shell_command
+    command: ".venv/bin/python scripts/100-knock/topic-1/generate_1_05_orders.py && test -f data/100-knock/topic-1/orders.csv"
+    timeout_sec: 60
+    points: 15
+
+  # ----- behavioural -----
+
+  - id: deterministic-price-per-product
+    description: "同じ product_id は常に同じ unit_price (関数依存 product_id -> unit_price)"
+    type: shell_command
+    command: |
+      set -euo pipefail
+      CSV=data/100-knock/topic-1/orders.csv
+      VIOLATIONS=$(awk -F, 'NR>1{print $4","$7}' "$CSV" \
+        | sort -u \
+        | awk -F, '{print $1}' \
+        | sort | uniq -c \
+        | awk '$1!=1' | wc -l | tr -d ' ')
+      echo "violations: $VIOLATIONS"
+      if [ "$VIOLATIONS" -ne 0 ]; then
+        echo "FAIL: $VIOLATIONS product_id(s) have multiple distinct unit_prices"
+        awk -F, 'NR>1{print $4","$7}' "$CSV" | sort -u | awk -F, '{print $1}' | sort | uniq -c | awk '$1!=1' | head -5
+        exit 1
+      fi
+      echo OK
+    expect_stdout_match: "OK"
+    points: 40
+
+  - id: price-matches-products-csv
+    description: "orders.unit_price が products.csv の unit_price と完全一致"
+    type: shell_command
+    command: |
+      set -euo pipefail
+      .venv/bin/python - <<'PY'
+      import csv, sys
+      from pathlib import Path
+
+      base = Path("data/100-knock/topic-1")
+      prod_path = base / "products.csv"
+      orders_path = base / "orders.csv"
+      if not prod_path.exists():
+          print(f"FAIL: missing {prod_path}")
+          sys.exit(1)
+      if not orders_path.exists():
+          print(f"FAIL: missing {orders_path}")
+          sys.exit(1)
+
+      prod_price = {}
+      with prod_path.open(newline="") as fh:
+          reader = csv.DictReader(fh)
+          if "product_id" not in reader.fieldnames or "unit_price" not in reader.fieldnames:
+              print(f"FAIL: products.csv columns: {reader.fieldnames}")
+              sys.exit(1)
+          for r in reader:
+              prod_price[int(r["product_id"])] = int(r["unit_price"])
+
+      mism = 0
+      total = 0
+      with orders_path.open(newline="") as fh:
+          reader = csv.DictReader(fh)
+          for r in reader:
+              total += 1
+              pid = int(r["product_id"])
+              op = int(r["unit_price"])
+              expected = prod_price.get(pid)
+              if expected is None:
+                  print(f"FAIL: order references unknown product_id={pid}")
+                  sys.exit(1)
+              if op != expected:
+                  mism += 1
+      print(f"checked={total} mismatches={mism}")
+      if mism != 0:
+          print(f"FAIL: {mism} rows have unit_price != products.unit_price")
+          sys.exit(1)
+      print("OK")
+      PY
+    expect_stdout_match: "OK"
+    points: 25
+
+  - id: orders-row-count
+    description: "orders.csv が 10,000 行 (上書き再生成後)"
+    type: csv_assert
+    path: data/100-knock/topic-1/orders.csv
+    expect_rows: 10000
+    points: 10

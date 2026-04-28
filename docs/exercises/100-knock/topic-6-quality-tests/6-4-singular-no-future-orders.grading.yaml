@@ -1,0 +1,64 @@
+# Grading definition for 100-knock Topic 6, Problem 6-4 (singular test: no future orders).
+# Run by: python scripts/grader/grade.py --exercise 100-knock-6-4-singular-no-future-orders
+#
+# 採点方針:
+#   - 構造チェック (file_exists / parse / SQL grep / manifest 上の test node 存在) で 60 点
+#   - データチェック (dbt_test_passes で test PASS, sql_assert で実データ上の
+#     遠未来日付が 0 行) で 40 点
+#   - SQL 内に `where order_date > current_date` の構造があることを grep で確認
+#
+# 前提:
+#   - Topic ② ③ ④ ⑤ 完了
+#   - 学習者は dbt/tests/100-knock/topic-6/assert_no_future_orders.sql を新規作成
+
+exercise: 100-knock-6-4-singular-no-future-orders
+title: "100-knock 6-4: singular test で『未来日付の注文は存在しない』 を表明"
+passing_score: 80
+
+expects_learner_files:
+  - dbt/tests/100-knock/topic-6/assert_no_future_orders.sql
+
+checks:
+  # ----- 構造チェック (60 点) -----
+
+  - id: singular-test-file-exists
+    description: "dbt/tests/100-knock/topic-6/assert_no_future_orders.sql が存在する"
+    type: file_exists
+    path: dbt/tests/100-knock/topic-6/assert_no_future_orders.sql
+    points: 15
+
+  - id: parse-success
+    description: "dbt parse が成功する (singular test の SQL 構文 OK)"
+    type: dbt_command
+    command: ["dbt", "parse"]
+    points: 10
+
+  - id: sql-has-order-date-future-check
+    description: "SQL 内に `where order_date > current_date` の構造がある (grep)"
+    type: shell_command
+    command: "grep -E 'order_date[[:space:]]*>[[:space:]]*current_date' dbt/tests/100-knock/topic-6/assert_no_future_orders.sql"
+    expect_stdout_match: "order_date.*current_date"
+    points: 15
+
+  - id: assert-no-future-orders-test-registered
+    description: "manifest に test.local_analytics.assert_no_future_orders が登録されている"
+    type: manifest_node_exists
+    node: test.local_analytics.assert_no_future_orders
+    points: 20
+
+  # ----- データチェック (40 点) -----
+
+  - id: assert-no-future-orders-passes
+    description: "dbt test --select test_name:assert_no_future_orders が PASS する"
+    type: dbt_test_passes
+    select: "test_name:assert_no_future_orders"
+    min_pass: 1
+    points: 25
+
+  - id: no-far-future-rows-in-staging
+    description: "実データ上で order_date > current_date + 90 日の行が存在しない"
+    type: sql_assert
+    sql: "SELECT count(*) FROM staging.stg_orders_100knock WHERE order_date > current_date + interval '90 days'"
+    op: eq
+    expected: 0
+    points: 15

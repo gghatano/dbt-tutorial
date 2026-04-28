@@ -1,0 +1,83 @@
+# Grading for 100-knock Topic 3 / Q8: dbt_project.yml の +materialized: で staging を view 一括宣言。
+# Run: python3 scripts/grader/grade.py --grading-file docs/exercises/100-knock/topic-3-staging/3-8-materialization-config.grading.yaml
+#
+# 注意: 本問のみ学習者が dbt/dbt_project.yml を編集する。MVP セクションを壊していないかを 1 つの check で検査。
+
+exercise: 100-knock-3-8-materialization-config
+title: "3-8: dbt_project.yml で stg_*_100knock の materialization を view に一括宣言"
+passing_score: 80
+
+expects_learner_files:
+  - dbt/dbt_project.yml
+
+checks:
+  - id: dbt-project-100knock-section
+    description: "dbt_project.yml に 100-knock: セクションが追加されている"
+    type: shell_command
+    command: |
+      set -euo pipefail
+      n=$(grep -cE '^\s*100-knock:' dbt/dbt_project.yml || echo 0)
+      echo "100-knock_section_count=${n}"
+      test "${n}" -ge 1
+    points: 20
+
+  - id: topic-3-materialized-view
+    description: "100-knock.topic-3 配下に +materialized: view がある"
+    type: shell_command
+    command: |
+      set -euo pipefail
+      python3 -c "
+      import yaml
+      with open('dbt/dbt_project.yml') as f:
+          cfg = yaml.safe_load(f)
+      knock = cfg['models']['local_analytics'].get('100-knock')
+      assert knock is not None, '100-knock: section not found'
+      topic3 = knock.get('topic-3')
+      assert topic3 is not None, 'topic-3: section not found'
+      mat = topic3.get('+materialized')
+      print('materialized=' + repr(mat))
+      assert mat == 'view', f'+materialized must be view, got {mat!r}'
+      "
+    points: 20
+
+  - id: mvp-staging-section-intact
+    description: "MVP の staging: / intermediate: / marts: セクションが無傷 (壊していない)"
+    type: shell_command
+    command: |
+      set -euo pipefail
+      python3 -c "
+      import yaml
+      with open('dbt/dbt_project.yml') as f:
+          cfg = yaml.safe_load(f)
+      la = cfg['models']['local_analytics']
+      for layer, expected_mat in [('staging', 'view'), ('intermediate', 'view'), ('marts', 'table')]:
+          sec = la.get(layer)
+          assert sec is not None, f'MVP layer {layer} missing'
+          mat = sec.get('+materialized')
+          assert mat == expected_mat, f'MVP {layer} +materialized changed: {mat!r}'
+          print(f'{layer} ok: +materialized={mat}')
+      "
+    points: 15
+
+  - id: dbt-parse-success
+    description: "dbt parse が成功する (dbt_project.yml が文法的に正しい)"
+    type: dbt_command
+    command: ["parse"]
+    points: 20
+
+  - id: manifest-stg-orders-materialized-view
+    description: "manifest.json で stg_orders_100knock の materialized が view になっている"
+    type: shell_command
+    command: |
+      set -euo pipefail
+      python3 -c "
+      import json
+      with open('dbt/target/manifest.json') as f:
+          m = json.load(f)
+      node = m['nodes'].get('model.local_analytics.stg_orders_100knock')
+      assert node is not None, 'stg_orders_100knock not in manifest'
+      mat = node['config']['materialized']
+      print('materialized=' + repr(mat))
+      assert mat == 'view', f'materialized must be view, got {mat!r}'
+      "
+    points: 25

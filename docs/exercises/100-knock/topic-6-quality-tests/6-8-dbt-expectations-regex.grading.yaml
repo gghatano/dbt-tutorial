@@ -1,0 +1,65 @@
+# Grading definition for 100-knock Topic 6, Problem 6-8 (dbt-expectations regex).
+# Run by: python scripts/grader/grade.py --grading-file docs/exercises/100-knock/topic-6-quality-tests/6-8-dbt-expectations-regex.grading.yaml
+#
+# 採点方針:
+#   - 構造チェック (packages.yml + dbt deps インストール + parse) で 50 点
+#   - データチェック (regex test PASS + manifest 上の test 登録) で 50 点
+#
+# 前提:
+#   - Topic ② ③ ④ ⑤ + Topic ⑥ 6-1〜6-5 完了
+#   - dbt/packages.yml は packages: [] で初期化済み (本問で dbt_expectations を追加)
+#   - dbt deps は採点パイプライン (CI / ローカル) で grade 実行前に走らせる前提
+
+exercise: 100-knock-6-8-dbt-expectations-regex
+title: "100-knock 6-8: dbt-expectations を導入、expect_column_values_to_match_regex で email 検証"
+passing_score: 80
+
+expects_learner_files:
+  - dbt/packages.yml
+  - dbt/models/100-knock/topic-3/schema.yml
+
+checks:
+  # ----- 構造チェック (50 点) -----
+
+  - id: packages-yml-has-dbt-expectations
+    description: "packages.yml に calogica/dbt_expectations が宣言されている"
+    type: shell_command
+    command: ["bash", "-c", "grep -E 'calogica/dbt_expectations' dbt/packages.yml"]
+    expect_exit_code: 0
+    points: 15
+
+  - id: dbt-expectations-installed
+    description: "dbt deps 後、dbt/dbt_packages/dbt_expectations/ が存在する"
+    type: file_exists
+    path: dbt/dbt_packages/dbt_expectations
+    points: 15
+
+  - id: parse-success
+    description: "dbt parse が成功する (dbt_expectations 参照を含む schema.yml が解釈可能)"
+    type: dbt_command
+    command: ["dbt", "parse"]
+    points: 10
+
+  - id: regex-test-declared-in-schema-yml
+    description: "schema.yml に dbt_expectations.expect_column_values_to_match_regex が宣言されている"
+    type: shell_command
+    command: ["bash", "-c", "grep -E 'dbt_expectations\\.expect_column_values_to_match_regex' dbt/models/100-knock/topic-3/schema.yml"]
+    expect_exit_code: 0
+    points: 10
+
+  # ----- データチェック (50 点) -----
+
+  - id: stg-customers-tests-pass-with-regex
+    description: "stg_customers_100knock の test (regex を含む) が PASS"
+    type: dbt_test_passes
+    select: stg_customers_100knock
+    min_pass: 4
+    points: 30
+
+  - id: email-regex-test-registered-in-manifest
+    description: "manifest に email 列の dbt_expectations regex test が登録されている"
+    type: shell_command
+    command: ["bash", "-c", "python3 -c \"import json; m=json.load(open('dbt/target/manifest.json')); ks=[k for k in m['nodes'] if 'expect_column_values_to_match_regex_stg_customers_100knock_email' in k]; assert ks, 'regex test for email not found in manifest'; print(ks[0])\""]
+    expect_exit_code: 0
+    expect_stdout_match: "expect_column_values_to_match_regex_stg_customers_100knock_email"
+    points: 20

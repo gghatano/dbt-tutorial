@@ -1,0 +1,46 @@
+# Grading for 100-knock Topic 2 / Q3: add description to every source column.
+# Run: python3 scripts/grader/grade.py --grading-file docs/exercises/100-knock/topic-2-raw-load/2-3-source-descriptions.grading.yaml
+
+exercise: 100-knock-2-3-source-descriptions
+title: "2-3: source 各 column に description を書き、dbt docs generate で見えるようにする"
+passing_score: 80
+
+expects_learner_files:
+  - dbt/models/100-knock/topic-2/sources.yml
+
+checks:
+  - id: sources-yml-exists
+    description: "dbt/models/100-knock/topic-2/sources.yml が存在する"
+    type: file_exists
+    path: dbt/models/100-knock/topic-2/sources.yml
+    points: 10
+
+  - id: description-count-min
+    description: "sources.yml に description: が 20 個以上含まれる (4 テーブル × 全列+ヘッダ)"
+    type: shell_command
+    command: "test $(grep -c 'description:' dbt/models/100-knock/topic-2/sources.yml) -ge 20"
+    points: 25
+
+  - id: description-mentions-pk
+    description: "PK 列の description に '主キー' という語が出現する"
+    type: shell_command
+    command: "grep -q '主キー' dbt/models/100-knock/topic-2/sources.yml"
+    points: 15
+
+  - id: description-mentions-fk
+    description: "FK 列の description に '外部キー' という語が出現する"
+    type: shell_command
+    command: "grep -q '外部キー' dbt/models/100-knock/topic-2/sources.yml"
+    points: 15
+
+  - id: dbt-parse-success
+    description: "description 追加後も dbt parse が成功する (構文 OK)"
+    type: dbt_command
+    command: ["dbt", "parse"]
+    points: 15
+
+  - id: dbt-docs-generate
+    description: "dbt docs generate が成功する (manifest + catalog 生成)"
+    type: dbt_command
+    command: ["dbt", "docs", "generate"]
+    points: 20
