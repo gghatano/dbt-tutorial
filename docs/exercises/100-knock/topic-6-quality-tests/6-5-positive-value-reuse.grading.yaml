@@ -1,0 +1,67 @@
+# Grading definition for 100-knock Topic 6, Problem 6-5 (positive_value generic test reuse on 3 columns).
+# Run by: python scripts/grader/grade.py --exercise 100-knock-6-5-positive-value-reuse
+#
+# 採点方針:
+#   - 構造チェック (file_exists / parse / schema.yml に positive_value が
+#     3 ヶ所以上 grep / manifest 上の 3 つの test node 登録) で 60 点
+#   - データチェック (dbt_test_passes で 3 件以上 PASS) で 40 点
+#
+# 前提:
+#   - Topic ② ③ ④ ⑤ 完了 (stg_orders_100knock + mart_monthly_sales_by_category_100knock 物理化済み)
+#   - 学習者は dbt/tests/generic/test_positive_value.sql を作成 (or 3-5 / Ex.08 の再利用)
+#   - schema.yml に positive_value を 3 列適用済み
+
+exercise: 100-knock-6-5-positive-value-reuse
+title: "100-knock 6-5: positive_value generic test を 3 列に再利用"
+passing_score: 80
+
+expects_learner_files:
+  - dbt/tests/generic/test_positive_value.sql
+  - dbt/models/100-knock/topic-3/schema.yml
+  - dbt/models/100-knock/topic-5/schema.yml
+
+checks:
+  # ----- 構造チェック (60 点) -----
+
+  - id: positive-value-generic-file-exists
+    description: "dbt/tests/generic/test_positive_value.sql が存在する"
+    type: file_exists
+    path: dbt/tests/generic/test_positive_value.sql
+    points: 10
+
+  - id: parse-success
+    description: "dbt parse が成功する"
+    type: dbt_command
+    command: ["dbt", "parse"]
+    points: 10
+
+  - id: schema-yml-has-positive-value-3-times
+    description: "schema.yml (topic-3 + topic-5) に positive_value が 3 ヶ所以上書かれている"
+    type: shell_command
+    command: "bash -c 'count=$(grep -c \"positive_value\" dbt/models/100-knock/topic-3/schema.yml dbt/models/100-knock/topic-5/schema.yml | awk -F: \"{s+=\\$2} END {print s}\"); echo \"COUNT=$count\"; [ \"$count\" -ge 3 ]'"
+    expect_stdout_match: "COUNT=[3-9]"
+    points: 15
+
+  - id: positive-value-three-test-nodes-registered
+    description: "manifest に 3 つの positive_value test node (stg_orders.quantity / stg_orders.unit_price / mart.total_sales_amount) が登録"
+    type: shell_command
+    command: "bash -c 'cnt=$(grep -oE \"positive_value_(stg_orders_100knock_quantity|stg_orders_100knock_unit_price|mart_monthly_sales_by_category_100knock_total_sales_amount)\" dbt/target/manifest.json | sort -u | wc -l | tr -d \" \"); echo \"NODE_COUNT=$cnt\"; [ \"$cnt\" -ge 3 ]'"
+    expect_stdout_match: "NODE_COUNT=[3-9]"
+    points: 25
+
+  # ----- データチェック (40 点) -----
+
+  - id: positive-value-tests-pass-3-or-more
+    description: "dbt test --select stg_orders_100knock mart_monthly_sales_by_category_100knock で 3 件以上 PASS"
+    type: dbt_test_passes
+    select: "stg_orders_100knock mart_monthly_sales_by_category_100knock"
+    min_pass: 3
+    points: 25
+
+  - id: mart-total-sales-amount-positive
+    description: "mart_monthly_sales_by_category_100knock.total_sales_amount が全行 > 0 (NULL も無し)"
+    type: sql_assert
+    sql: "SELECT count(*) FROM marts.mart_monthly_sales_by_category_100knock WHERE total_sales_amount IS NULL OR total_sales_amount <= 0"
+    op: eq
+    expected: 0
+    points: 15

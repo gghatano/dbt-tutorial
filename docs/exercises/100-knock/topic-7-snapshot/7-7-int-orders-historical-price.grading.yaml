@@ -1,0 +1,61 @@
+# Grading for 100-knock Topic 7 / Q7: int_orders_with_historical_price_100knock を
+# snap_products_100knock を ref した range JOIN で作る。
+# Run: python3 scripts/grader/grade.py --grading-file docs/exercises/100-knock/topic-7-snapshot/7-7-int-orders-historical-price.grading.yaml
+
+exercise: 100-knock-7-7-int-orders-historical-price
+title: "7-7: snap を ref した int_orders_with_historical_price_100knock"
+passing_score: 80
+
+expects_learner_files:
+  - dbt/models/100-knock/topic-7/int_orders_with_historical_price_100knock.sql
+
+checks:
+  - id: model-file-exists
+    description: "int_orders_with_historical_price_100knock.sql が存在する"
+    type: file_exists
+    path: dbt/models/100-knock/topic-7/int_orders_with_historical_price_100knock.sql
+    min_size_bytes: 100
+    points: 10
+
+  - id: parse-success
+    description: "dbt parse が成功する"
+    type: dbt_command
+    command: ["parse"]
+    points: 10
+
+  - id: model-node-declared
+    description: "manifest に model.local_analytics.int_orders_with_historical_price_100knock が登録"
+    type: manifest_node_exists
+    node: model.local_analytics.int_orders_with_historical_price_100knock
+    points: 15
+
+  - id: model-depends-on-snapshot
+    description: "上流に snapshot.local_analytics.snap_products_100knock を含む"
+    type: manifest_lineage
+    node: model.local_analytics.int_orders_with_historical_price_100knock
+    upstream_min_count: 2
+    upstream_must_include:
+      - snapshot.local_analytics.snap_products_100knock
+      - model.local_analytics.int_order_details_100knock
+    points: 30
+
+  - id: model-has-unit-price-column
+    description: "DB 上で unit_price 列が存在する (注文時点の単価が引けている)"
+    type: sql_assert
+    sql: |
+      SELECT count(*)::int
+      FROM information_schema.columns
+      WHERE table_schema = 'intermediate'
+        AND table_name   = 'int_orders_with_historical_price_100knock'
+        AND column_name  = 'unit_price'
+    op: eq
+    expected: 1
+    points: 20
+
+  - id: model-row-count-10000
+    description: "行数 = 10,000 (注文 1 件 1 行を維持、master 漏れなし)"
+    type: sql_assert
+    sql: "SELECT count(*)::int FROM intermediate.int_orders_with_historical_price_100knock"
+    op: eq
+    expected: 10000
+    points: 15

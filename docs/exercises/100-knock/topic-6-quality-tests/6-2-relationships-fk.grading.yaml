@@ -1,0 +1,60 @@
+# Grading definition for 100-knock Topic 6, Problem 6-2 (relationships FK; intentional FAIL).
+# Run by: python scripts/grader/grade.py --exercise 100-knock-6-2-relationships-fk
+#
+# 採点方針:
+#   - 構造チェック (parse / schema.yml grep / manifest 上の test node 存在) で 50 点
+#   - 反転データチェック (sql_assert で「不正行 >= 1」, shell_command で
+#     dbt test の exit code = 1) で 50 点
+#   - dbt_test_passes は使わない (本問では FAIL するのが正解)
+#
+# 前提:
+#   - Topic ② ③ ④ ⑤ 完了 (stg_orders_100knock / stg_customers_100knock 物理化済み)
+#   - 学習者は schema.yml で relationships を宣言、raw.orders に
+#     存在しない customer_id (例: 99999) を 1 行混ぜている
+
+exercise: 100-knock-6-2-relationships-fk
+title: "100-knock 6-2: relationships で FK 契約、わざと FAIL を体感"
+passing_score: 80
+
+expects_learner_files:
+  - dbt/models/100-knock/topic-3/schema.yml
+
+checks:
+  # ----- 構造チェック (50 点) -----
+
+  - id: parse-success
+    description: "dbt parse が成功する (relationships の YAML 構文 OK)"
+    type: dbt_command
+    command: ["dbt", "parse"]
+    points: 10
+
+  - id: schema-yml-has-relationships
+    description: "schema.yml に relationships test が宣言されている (grep)"
+    type: shell_command
+    command: "grep -n 'relationships' dbt/models/100-knock/topic-3/schema.yml"
+    expect_stdout_match: "relationships"
+    points: 15
+
+  - id: relationships-test-registered
+    description: "manifest に relationships test (customer_id → stg_customers_100knock) が登録されている"
+    type: manifest_node_exists
+    node: test.local_analytics.relationships_stg_orders_100knock_customer_id__customer_id__ref_stg_customers_100knock_
+    points: 25
+
+  # ----- 反転データチェック (50 点) -----
+
+  - id: invalid-fk-row-exists
+    description: "raw 上で『親に存在しない customer_id』 が 1 行以上存在する (= FAIL する状態を作っている)"
+    type: sql_assert
+    sql: "SELECT count(*) FROM staging.stg_orders_100knock WHERE customer_id NOT IN (SELECT customer_id FROM staging.stg_customers_100knock)"
+    op: gte
+    expected: 1
+    points: 25
+
+  - id: dbt-test-exits-non-zero
+    description: "dbt test --select stg_orders_100knock が exit 1 で落ちる (FAIL を確認)"
+    type: shell_command
+    command: ["bash", "-c", "cd dbt && ../.venv/bin/dbt test --profiles-dir . --select stg_orders_100knock; echo \"EXIT=$?\""]
+    expect_stdout_match: "EXIT=1"
+    expect_exit_code: 0
+    points: 25
