@@ -6,7 +6,7 @@ README のクイックスタートを補足する詳細手順。`docker compose 
 
 | 区分 | 技術 | バージョン | 役割 |
 |---|---|---|---|
-| Linux VM (macOS) | Colima | 0.10+ | Docker を動かす軽量 VM。Docker Desktop の代替 |
+| Docker ランタイム | Docker Engine (Linux / WSL2) もしくは Colima (macOS) | 24+ / 0.10+ | コンテナ実行基盤 |
 | コンテナ実行 | Docker Compose | v2 系 | PostgreSQL / Metabase の起動 |
 | IaC | Terraform | 1.14.9 | schema / role / grant の宣言的構築 |
 | DWH 代替 | PostgreSQL | 17-alpine | analytics DB |
@@ -17,10 +17,10 @@ README のクイックスタートを補足する詳細手順。`docker compose 
 
 ## 前提
 
-- macOS（Apple Silicon / Intel 両対応）。Linux でも動くが手順未検証。
-- Homebrew インストール済み。
-- Docker Desktop は **使用しない**。Colima を使う。
-- Docker Desktop からの移行者: `~/.docker/config.json` の `"credsStore": "desktop"` を削除しておく（残っていると `docker pull` が無言ハングする。詳細は [troubleshooting.md](troubleshooting.md) と [ADR-0002](decisions/0002-tooling-baseline.md)）。
+- 対応 OS: **macOS (Apple Silicon / Intel)** / **Linux** / **Windows + WSL2** いずれも動作確認済。
+- Docker daemon を起動できること(各 OS の手順は §1〜§2 参照)。
+- macOS: Docker Desktop は **使用しない**。Colima を使う(ライセンス回避 + ネイティブ依存削減)。
+  - Docker Desktop からの移行者: `~/.docker/config.json` の `"credsStore": "desktop"` を削除しておく(残っていると `docker pull` が無言ハングする。詳細は [troubleshooting.md](troubleshooting.md) と [ADR-0002](decisions/0002-tooling-baseline.md))。
 
 ## cwd 規約
 
@@ -30,15 +30,43 @@ README のクイックスタートを補足する詳細手順。`docker compose 
 
 ### 1. ツールインストール
 
+OS ごとに手順が異なる。共通: **Docker / docker-compose / uv / Terraform** が `PATH` に通っていれば OK。
+
+#### 1a. macOS (Homebrew)
+
 ```bash
 # cwd: ~/repo
 brew install colima docker docker-compose uv
 brew install hashicorp/tap/terraform
 ```
 
+#### 1b. Linux (Debian/Ubuntu 系)
+
+```bash
+# Docker Engine + Compose plugin (公式リポジトリ推奨。詳細は https://docs.docker.com/engine/install/)
+sudo apt-get update
+sudo apt-get install -y docker.io docker-compose-plugin
+
+# uv (Python 不要。バイナリインストール)
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# Terraform (HashiCorp 公式 apt repo か、tfenv / バイナリ DL)
+# https://developer.hashicorp.com/terraform/install
+```
+
+`docker` を sudo なしで使うなら `sudo usermod -aG docker $USER` 後に再ログイン。
+
+#### 1c. Windows + WSL2
+
+WSL2 ディストリ(Ubuntu 等)を起動してから上記 **1b** と同じ手順。Docker Desktop の WSL 統合を使う場合はホスト側で Docker Desktop を起動するだけで `docker` コマンドが WSL に渡る。
+
+> Note: 本リポジトリは WSL2 (Ubuntu, kernel 5.15) で動作確認済。
+
 uv は Python 自体も管理する。`uv venv --python 3.12` が必要バージョンを自動 DL するため、システム python3 / pyenv は不要。
 
-### 2. Colima 起動
+### 2. Docker ランタイム起動
+
+#### 2a. macOS (Colima)
 
 ```bash
 # cwd: ~/repo
@@ -49,6 +77,21 @@ colima status   # arch / runtime / cpu / memory が表示されること
 ```
 
 Metabase まで動かす場合は memory 8 GB 必須（Metabase は amd64 エミュレーションで動く）。
+
+#### 2b. Linux / WSL2
+
+Docker daemon が起動していれば追加手順は不要。
+
+```bash
+# Linux (systemd)
+sudo systemctl start docker
+sudo systemctl enable docker  # 自動起動が必要なら
+
+# 確認
+docker info | head
+```
+
+WSL2 + Docker Desktop の場合は Docker Desktop を起動するだけで daemon が立ち上がる。Linux ネイティブで Metabase を動かす場合もメモリ 8 GB 程度を割り当てておく(`/etc/wsl.conf` か Docker Desktop の Resources で確認)。
 
 ### 3. PostgreSQL 起動
 

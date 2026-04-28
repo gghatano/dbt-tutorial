@@ -13,9 +13,9 @@
 | `Couldn't connect to the database` (Metabase 設定画面) | Metabase setup | host を `localhost` にしている。`postgres` を使う | [dashboard.md](dashboard.md) |
 | `Compilation Error: ... generate_schema_name` | `dbt run` | `macros/get_custom_schema.sql` を消した | [ADR-0005](decisions/0005-dbt-config.md) |
 
-## `docker pull` が無言ハングする / `exit 144`
+## `docker pull` が無言ハングする / `exit 144` (macOS)
 
-`~/.docker/config.json` に `"credsStore": "desktop"` が残っているのに Docker Desktop が無いと、credential helper が応答せずハングする。
+macOS で Docker Desktop から Colima へ移行した直後に発生しやすい。`~/.docker/config.json` に `"credsStore": "desktop"` が残っているのに Docker Desktop が無いと、credential helper が応答せずハングする。
 
 確認:
 
@@ -30,16 +30,19 @@ grep credsStore ~/.docker/config.json || echo "OK"
 dbt-postgres のデフォルトでは `+schema: marts` は `<target_schema>_marts` に解決される。  
 本プロジェクトは `dbt/macros/get_custom_schema.sql` で `generate_schema_name` を override し、`marts` schema をそのまま使う。詳細は [ADR-0005](decisions/0005-dbt-config.md)。
 
-## Apple Silicon で特定イメージが遅い
+## Apple Silicon で特定イメージが遅い (macOS)
 
-`postgres:17-alpine` は arm64 ネイティブで問題なし。Metabase は amd64 のみ提供のため Rosetta / qemu エミュレーションで動く（起動に 60〜120 秒、メモリは 1GB+）。x86 依存サービスを追加する場合は `platform: linux/amd64` を指定可能。
+`postgres:17-alpine` は arm64 ネイティブで問題なし。Metabase は amd64 のみ提供のため Rosetta / qemu エミュレーションで動く（起動に 60〜120 秒、メモリは 1GB+）。x86 依存サービスを追加する場合は `platform: linux/amd64` を指定可能。Linux / WSL2 では同じ amd64 ホストならエミュレーションは発生せず、初回起動も速い。
 
 ## Postgres に接続できない
 
 ```bash
+# macOS (Colima) のみ: VM が止まっていないか
 colima status                                  # running 確認
+
+# 全 OS 共通
 docker compose ps                              # postgres healthy 確認
-lsof -i :5432                                  # ポート競合確認
+lsof -i :5432                                  # ポート競合確認 (Linux/WSL2 は ss -ltnp '( sport = :5432 )' でも可)
 docker exec local-data-postgres pg_isready -U analytics_user -d analytics
 ```
 
@@ -115,4 +118,8 @@ Metabase は amd64 エミュレーションのため初回起動が遅い（健�
 docker logs -f local-data-metabase
 ```
 
-`Metabase Initialization COMPLETE` が出れば healthy になる直前。それ以降待っても healthy にならない場合は Colima のメモリ不足の可能性が高い（`colima start --memory 8` 以上推奨）。
+`Metabase Initialization COMPLETE` が出れば healthy になる直前。それ以降待っても healthy にならない場合はランタイムのメモリ不足の可能性が高い:
+
+- macOS (Colima): `colima start --memory 8` 以上で再起動
+- WSL2: `~/.wslconfig` に `memory=8GB`、`wsl --shutdown` で再起動
+- Linux ネイティブ / Docker Desktop: ホストの空きメモリ確認

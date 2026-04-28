@@ -139,12 +139,14 @@ Metabase からは **readonly_user** で接続することを推奨。理由:
 ### Metabase が起動しない / 504
 
 - `docker logs local-data-metabase --tail 50` で確認
-- 60 秒以上経っても healthy にならない場合は CPU/RAM 不足が疑わしい。Colima のリソースを増やす:
-  ```bash
-  colima stop
-  colima start --cpu 4 --memory 8 --disk 20  # spec §15.2 推奨
-  docker compose up -d
-  ```
+- 60 秒以上経っても healthy にならない場合は CPU/RAM 不足が疑わしい。ランタイムにメモリを割り当て直す。
+  - macOS (Colima):
+    ```bash
+    colima stop
+    colima start --cpu 4 --memory 8 --disk 20  # spec §15.2 推奨
+    docker compose up -d
+    ```
+  - Linux / WSL2: Docker Desktop なら Settings → Resources、純 Linux なら cgroup 制限を外す。WSL2 の場合は `~/.wslconfig` で `memory=8GB` を設定し `wsl --shutdown` で再起動。
 
 ### postgres ホスト名が解決しない
 
