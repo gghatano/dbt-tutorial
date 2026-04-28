@@ -285,7 +285,158 @@ def run_file_exists(params: dict, ctx: GraderContext) -> CheckResult:
     full = (ctx.repo_root / path).resolve()
     if not full.exists():
         return CheckResult(False, f"file missing: {path}")
+    min_size = params.get("min_size_bytes")
+    if min_size is not None:
+        size = full.stat().st_size
+        if size < min_size:
+            return CheckResult(False, f"file too small: {size} < {min_size} bytes")
     return CheckResult(True, f"file exists: {path}")
+
+
+# ---------------------------------------------------------------------------
+# shell_command
+# ---------------------------------------------------------------------------
+
+def run_shell_command(params: dict, ctx: GraderContext) -> CheckResult:
+    """Run any command, optionally check stdout against a regex.
+
+    params:
+      command: list[str] | str   (str is run via `bash -c`)
+      cwd: str (default = repo root)
+      timeout_sec: int (default 60)
+      expect_stdout_match: str   regex; checked against stdout
+      expect_exit_code: int (default 0)
+    """
+    cmd = params.get("command")
+    if not cmd:
+        return CheckResult(False, "command field missing")
+    if isinstance(cmd, str):
+        cmd_list = ["bash", "-c", cmd]
+    else:
+        cmd_list = list(cmd)
+    cwd = params.get("cwd", str(ctx.repo_root))
+    try:
+        proc = subprocess.run(
+            cmd_list,
+            cwd=cwd,
+            capture_output=True,
+            text=True,
+            timeout=params.get("timeout_sec", 60),
+        )
+    except subprocess.TimeoutExpired as exc:
+        return CheckResult(False, "command timed out", str(exc))
+    expect_code = params.get("expect_exit_code", 0)
+    if proc.returncode != expect_code:
+        return CheckResult(
+            False,
+            f"exit {proc.returncode} (expected {expect_code})",
+            _tail(proc.stdout + proc.stderr),
+        )
+    pattern = params.get("expect_stdout_match")
+    if pattern:
+        if not re.search(pattern, proc.stdout):
+            return CheckResult(
+                False,
+                f"stdout did not match: {pattern!r}",
+                _tail(proc.stdout),
+            )
+    return CheckResult(True, "ok")
+
+
+# ---------------------------------------------------------------------------
+# csv_assert
+# ---------------------------------------------------------------------------
+
+def run_csv_assert(params: dict, ctx: GraderContext) -> CheckResult:
+    """Assert properties of a CSV file (row count, column set, value ranges).
+
+    params:
+      path: str    (relative to repo root)
+      expect_rows: int | dict   { eq | gte | lte | between: [lo, hi] }
+      expect_columns: list[str]   exact column header set (order-insensitive)
+      expect_unique: list[str]    columns that must have unique values
+      expect_no_nulls: list[str]  columns that must not contain empty strings
+    """
+    path = params.get("path")
+    if not path:
+        return CheckResult(False, "path field missing")
+    full = (ctx.repo_root / path).resolve()
+    if not full.exists():
+        return CheckResult(False, f"csv missing: {path}")
+
+    import csv as _csv
+
+    try:
+        with full.open(newline="") as fh:
+            reader = _csv.reader(fh)
+            try:
+                header = next(reader)
+            except StopIteration:
+                return CheckResult(False, "csv is empty")
+            rows = list(reader)
+    except Exception as exc:
+        return CheckResult(False, f"csv read error: {exc}")
+
+    msgs = []
+    failed = False
+
+    expect_rows = params.get("expect_rows")
+    if expect_rows is not None:
+        rc = len(rows)
+        if isinstance(expect_rows, int):
+            if rc != expect_rows:
+                msgs.append(f"rows: got={rc} expected={expect_rows}")
+                failed = True
+            else:
+                msgs.append(f"rows={rc} OK")
+        elif isinstance(expect_rows, dict):
+            for op, want in expect_rows.items():
+                if not _compare(rc, op, want):
+                    msgs.append(f"rows={rc} not {op} {want}")
+                    failed = True
+                else:
+                    msgs.append(f"rows={rc} {op} {want} OK")
+
+    expect_columns = params.get("expect_columns")
+    if expect_columns is not None:
+        if set(header) != set(expect_columns):
+            extra = set(header) - set(expect_columns)
+            missing = set(expect_columns) - set(header)
+            msgs.append(f"columns mismatch: extra={sorted(extra)} missing={sorted(missing)}")
+            failed = True
+        else:
+            msgs.append("columns OK")
+
+    expect_unique = params.get("expect_unique") or []
+    for col in expect_unique:
+        if col not in header:
+            msgs.append(f"unique({col}): column missing")
+            failed = True
+            continue
+        idx = header.index(col)
+        vals = [r[idx] for r in rows if idx < len(r)]
+        if len(vals) != len(set(vals)):
+            dup = len(vals) - len(set(vals))
+            msgs.append(f"unique({col}): {dup} duplicates")
+            failed = True
+        else:
+            msgs.append(f"unique({col}) OK")
+
+    expect_no_nulls = params.get("expect_no_nulls") or []
+    for col in expect_no_nulls:
+        if col not in header:
+            msgs.append(f"no_nulls({col}): column missing")
+            failed = True
+            continue
+        idx = header.index(col)
+        nulls = sum(1 for r in rows if idx < len(r) and (r[idx] is None or r[idx] == ""))
+        if nulls > 0:
+            msgs.append(f"no_nulls({col}): {nulls} empty")
+            failed = True
+        else:
+            msgs.append(f"no_nulls({col}) OK")
+
+    return CheckResult(not failed, "; ".join(msgs) or "ok")
 
 
 # ---------------------------------------------------------------------------
@@ -310,4 +461,6 @@ CHECK_TYPES: Dict[str, CheckFn] = {
     "dbt_test_passes": run_dbt_test_passes,
     "sql_assert": run_sql_assert,
     "file_exists": run_file_exists,
+    "shell_command": run_shell_command,
+    "csv_assert": run_csv_assert,
 }

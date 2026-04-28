@@ -1,0 +1,75 @@
+# Grading for 100-knock Topic 1 / Q7: order_date range [2025-01-01, 2026-04-30].
+# Run: python3 scripts/grader/grade.py --grading-file docs/exercises/100-knock/topic-1-data-generation/1-7-date-range.grading.yaml
+
+exercise: 100-knock-1-7-date-range
+title: "1-7: orders.order_date を 2025-01-01 〜 2026-04-30 の範囲で分散"
+passing_score: 80
+
+expects_learner_files:
+  - scripts/100-knock/topic-1/generate_1_7_date_range.py
+
+checks:
+  - id: script-exists
+    description: "学習者が generate_1_7_date_range.py を作成した"
+    type: file_exists
+    path: scripts/100-knock/topic-1/generate_1_7_date_range.py
+    points: 10
+
+  - id: script-runs
+    description: "スクリプト実行が成功する (exit 0)"
+    type: shell_command
+    command: ["python3", "scripts/100-knock/topic-1/generate_1_7_date_range.py"]
+    points: 15
+
+  - id: order-date-min
+    description: "order_date の最小値が 2025-01-01 ± 数日 (= 2025-01-01..2025-01-07)"
+    type: shell_command
+    command: |
+      python3 -c "
+      import csv
+      with open('data/100-knock/topic-1/orders.csv') as f:
+          dates = [row['order_date'] for row in csv.DictReader(f)]
+      mn = min(dates)
+      print(f'min={mn}')
+      assert '2025-01-01' <= mn <= '2025-01-07', f'min out of range: {mn}'
+      "
+    expect_stdout_match: "min=2025-01-0[1-7]"
+    points: 25
+
+  - id: order-date-max
+    description: "order_date の最大値が 2026-04-30 ± 数日 (= 2026-04-24..2026-04-30)"
+    type: shell_command
+    command: |
+      python3 -c "
+      import csv
+      with open('data/100-knock/topic-1/orders.csv') as f:
+          dates = [row['order_date'] for row in csv.DictReader(f)]
+      mx = max(dates)
+      print(f'max={mx}')
+      assert '2026-04-24' <= mx <= '2026-04-30', f'max out of range: {mx}'
+      "
+    expect_stdout_match: "max=2026-04-(2[4-9]|30)"
+    points: 25
+
+  - id: order-date-distinct
+    description: "order_date の distinct 値数 >= 200 (十分に分散している)"
+    type: shell_command
+    command: |
+      python3 -c "
+      import csv
+      with open('data/100-knock/topic-1/orders.csv') as f:
+          dates = {row['order_date'] for row in csv.DictReader(f)}
+      n = len(dates)
+      print(f'distinct={n}')
+      assert n >= 200, f'distinct dates {n} < 200'
+      "
+    expect_stdout_match: "distinct=[2-9][0-9][0-9]|distinct=[1-9][0-9]{3,}"
+    points: 15
+
+  - id: csv-row-count-and-no-null-date
+    description: "orders.csv が 10000 行 + ヘッダ、order_date 列に NULL なし"
+    type: csv_assert
+    path: data/100-knock/topic-1/orders.csv
+    expect_rows: 10000
+    expect_no_nulls: [order_date]
+    points: 10

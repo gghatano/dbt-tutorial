@@ -44,21 +44,37 @@ DEFAULT_GRADING_DIR = REPO_ROOT / "docs" / "exercises"
 def find_grading_file(exercise: str) -> Path:
     """Resolve --exercise to a grading.yaml path.
 
-    Accepts forms: '06', '06-exposures', 'docs/exercises/06-...grading.yaml'.
+    Accepts forms:
+      - '06' / '06-exposures'              (existing 10 exercises, flat)
+      - '1-3' / '1-3-stores'               (100-knock, sub-dir)
+      - '100-knock-1-3' / 'knock-1-3'      (CI-style id, prefix stripped)
+      - any explicit file path
     """
     p = Path(exercise)
     if p.is_file():
         return p
+
+    # 1) flat search at docs/exercises/
     candidates = sorted(DEFAULT_GRADING_DIR.glob(f"{exercise}*.grading.yaml"))
+
+    # 2) recursive search (catches docs/exercises/100-knock/*/...)
     if not candidates:
-        # fallback: 100-knock pattern docs/exercises/100-knock/<topic>-<num>-*.grading.yaml
-        knock_dir = DEFAULT_GRADING_DIR / "100-knock"
-        if knock_dir.exists():
-            candidates = sorted(knock_dir.glob(f"{exercise}*.grading.yaml"))
+        candidates = sorted(DEFAULT_GRADING_DIR.rglob(f"{exercise}*.grading.yaml"))
+
+    # 3) strip common CI prefixes and try again
+    if not candidates:
+        bare = exercise
+        for prefix in ("100-knock-", "knock-"):
+            if bare.startswith(prefix):
+                bare = bare[len(prefix):]
+                break
+        if bare != exercise:
+            candidates = sorted(DEFAULT_GRADING_DIR.rglob(f"{bare}*.grading.yaml"))
+
     if not candidates:
         raise FileNotFoundError(f"no grading.yaml matched: {exercise}")
     if len(candidates) > 1:
-        names = ", ".join(c.name for c in candidates)
+        names = ", ".join(str(c.relative_to(DEFAULT_GRADING_DIR)) for c in candidates)
         raise FileNotFoundError(f"multiple grading.yaml matched ({names}); be more specific")
     return candidates[0]
 

@@ -1,0 +1,76 @@
+# Grading for 100-knock Topic 1 / Q10: write _stats.json (data contract).
+# Run: python3 scripts/grader/grade.py --grading-file docs/exercises/100-knock/topic-1-data-generation/1-10-stats-json.grading.yaml
+#
+# PREREQUISITES: 1-1 〜 1-8 must be done so that the input CSVs exist:
+#   - data/100-knock/topic-1/customers.csv  (1-1)
+#   - data/100-knock/topic-1/products.csv   (1-2)
+#   - data/100-knock/topic-1/stores.csv     (1-3)
+#   - data/100-knock/topic-1/orders.csv     (1-4 / 1-5 / 1-6 / 1-7)
+#   - data/100-knock/topic-1/reviews.csv    (1-8)
+# If those CSVs are missing, this grading will fail at the "rows == N" checks.
+
+exercise: 100-knock-1-10-stats-json
+title: "1-10: 生成データの行数・列・null 比率を _stats.json に書き出す"
+passing_score: 80
+
+expects_learner_files:
+  - scripts/100-knock/topic-1/generate_1_10_stats.py
+
+checks:
+  - id: script-exists
+    description: "学習者が generate_1_10_stats.py を作成した"
+    type: file_exists
+    path: scripts/100-knock/topic-1/generate_1_10_stats.py
+    points: 10
+
+  - id: script-runs
+    description: "スクリプト実行が成功する (exit 0)"
+    type: shell_command
+    command:
+      - "python3"
+      - "scripts/100-knock/topic-1/generate_1_10_stats.py"
+    points: 15
+
+  - id: stats-json-exists
+    description: "data/100-knock/topic-1/_stats.json が 100 bytes 以上で存在する"
+    type: file_exists
+    path: data/100-knock/topic-1/_stats.json
+    min_size_bytes: 100
+    points: 20
+
+  - id: stats-json-valid
+    description: "_stats.json が json.load() 可能 (有効な JSON)"
+    type: shell_command
+    command:
+      - "python3"
+      - "-c"
+      - "import json; json.load(open('data/100-knock/topic-1/_stats.json'))"
+    points: 20
+
+  - id: customers-rows-1000
+    description: "files['customers.csv']['rows'] == 1000 (1-1 の出力を正しく集計)"
+    type: shell_command
+    command: |
+      set -euo pipefail
+      python3 -c "
+      import json, sys
+      s = json.load(open('data/100-knock/topic-1/_stats.json'))
+      rows = s['files']['customers.csv']['rows']
+      print(f'customers.csv rows={rows}')
+      assert rows == 1000, f'expected 1000, got {rows}'
+      "
+    points: 20
+
+  - id: orders-rows-10000
+    description: "files['orders.csv']['rows'] == 10000 (1-4 の出力を正しく集計)"
+    type: shell_command
+    command: |
+      set -euo pipefail
+      python3 -c "
+      import json, sys
+      s = json.load(open('data/100-knock/topic-1/_stats.json'))
+      rows = s['files']['orders.csv']['rows']
+      print(f'orders.csv rows={rows}')
+      assert rows == 10000, f'expected 10000, got {rows}'
+      "
+    points: 15

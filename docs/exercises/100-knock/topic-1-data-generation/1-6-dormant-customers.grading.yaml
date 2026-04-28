@@ -1,0 +1,61 @@
+# Grading for 100-knock Topic 1 / Q6: 1% dormant customers in orders.csv.
+# Run: python3 scripts/grader/grade.py --grading-file docs/exercises/100-knock/topic-1-data-generation/1-6-dormant-customers.grading.yaml
+
+exercise: 100-knock-1-6-dormant-customers
+title: "1-6: customer_id の 1% は orders に登場しない (休眠顧客)"
+passing_score: 80
+
+expects_learner_files:
+  - scripts/100-knock/topic-1/generate_1_6_dormant_customers.py
+
+checks:
+  - id: script-exists
+    description: "学習者が generate_1_6_dormant_customers.py を作成した"
+    type: file_exists
+    path: scripts/100-knock/topic-1/generate_1_6_dormant_customers.py
+    points: 10
+
+  - id: script-runs
+    description: "スクリプト実行が成功する (exit 0)"
+    type: shell_command
+    command: ["python3", "scripts/100-knock/topic-1/generate_1_6_dormant_customers.py"]
+    points: 15
+
+  - id: dormant-count-around-10
+    description: "orders に出てこない customer_id が 10 ± 2 個 (約 1% 休眠)"
+    type: shell_command
+    command: |
+      python3 -c "
+      import csv
+      with open('data/100-knock/topic-1/orders.csv') as f:
+          seen = {int(row['customer_id']) for row in csv.DictReader(f)}
+      all_ids = set(range(1, 1001))
+      dormant = all_ids - seen
+      n = len(dormant)
+      print(f'dormant_count={n}')
+      assert 8 <= n <= 12, f'expected dormant 8..12, got {n}'
+      "
+    expect_stdout_match: "dormant_count=(8|9|10|11|12)"
+    points: 40
+
+  - id: distinct-active-around-990
+    description: "orders に登場する distinct customer_id 数が 990 ± 2 (= 988..992)"
+    type: shell_command
+    command: |
+      python3 -c "
+      import csv
+      with open('data/100-knock/topic-1/orders.csv') as f:
+          seen = {int(row['customer_id']) for row in csv.DictReader(f)}
+      n = len(seen)
+      print(f'active_count={n}')
+      assert 988 <= n <= 992, f'expected active 988..992, got {n}'
+      "
+    expect_stdout_match: "active_count=(988|989|990|991|992)"
+    points: 25
+
+  - id: csv-row-count
+    description: "data/100-knock/topic-1/orders.csv が 10000 データ行 + ヘッダ"
+    type: csv_assert
+    path: data/100-knock/topic-1/orders.csv
+    expect_rows: 10000
+    points: 10

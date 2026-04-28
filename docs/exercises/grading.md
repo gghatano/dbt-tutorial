@@ -105,7 +105,7 @@ checks:
     # ... type 固有の params
 ```
 
-### check 種別 (現状 7 種)
+### check 種別 (現状 9 種)
 
 | type | 用途 | 主な params |
 |---|---|---|
@@ -115,7 +115,9 @@ checks:
 | `manifest_config` | model config の値 (例: `materialized: incremental`, `contract.enforced: true`) | `node:`, `expected:` (dict, dotted key OK) |
 | `dbt_test_passes` | `dbt test --select <selector>` が PASS | `select:`, `min_pass:` |
 | `sql_assert` | psql でクエリ実行、結果と比較 | `sql:`, `op:` (eq/ne/gte/gt/lte/lt/in/between), `expected:` |
-| `file_exists` | リポジトリ内の任意パス存在チェック | `path:` |
+| `file_exists` | リポジトリ内の任意パス存在チェック | `path:`, optional `min_size_bytes:` |
+| `shell_command` | 任意コマンド実行、exit code と stdout 正規表現を検証 | `command:` (list or shell str), `cwd:`, `expect_stdout_match:`, `expect_exit_code:` |
+| `csv_assert` | CSV ファイルの行数・列・unique・NULL を検証 | `path:`, `expect_rows:` (int or {eq/gte/lte/between}), `expect_columns:` (list), `expect_unique:` (list), `expect_no_nulls:` (list) |
 
 ### 設計指針
 
