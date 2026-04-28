@@ -1,0 +1,75 @@
+# Grading definition for 100-knock Topic 4, Problem 4-4 (with vs without int — lineage diff).
+# Run by: python scripts/grader/grade.py --grading-file docs/exercises/100-knock/topic-4-intermediate/4-4-with-vs-without-int.grading.yaml
+#
+# 採点方針:
+#   - 構造チェック (file_exists × 2, parse, manifest × 2) で 50 点
+#   - lineage チェック (without_int は staging 4 本依存 / with_int は int 1 本依存) で 50 点
+#   - 学習者は mart_compare_with_int.sql + mart_compare_without_int.sql をコミット済み
+#
+# 前提:
+#   - 4-1 完了 (int_order_details_100knock が manifest に登録済み)
+#   - Topic ③ 完了 (stg_*_100knock 4 本)
+
+exercise: 100-knock-4-4-with-vs-without-int
+title: "100-knock 4-4: int を切る版・切らない版を両方書いて lineage を比較する"
+passing_score: 80
+
+expects_learner_files:
+  - dbt/models/100-knock/topic-4/mart_compare_with_int.sql
+  - dbt/models/100-knock/topic-4/mart_compare_without_int.sql
+
+checks:
+  # ----- 構造チェック (50 点) -----
+
+  - id: mart-with-int-file-exists
+    description: "dbt/models/100-knock/topic-4/mart_compare_with_int.sql が存在する"
+    type: file_exists
+    path: dbt/models/100-knock/topic-4/mart_compare_with_int.sql
+    points: 10
+
+  - id: mart-without-int-file-exists
+    description: "dbt/models/100-knock/topic-4/mart_compare_without_int.sql が存在する"
+    type: file_exists
+    path: dbt/models/100-knock/topic-4/mart_compare_without_int.sql
+    points: 10
+
+  - id: parse-success
+    description: "dbt parse が成功する (両 mart の SQL / Jinja 構文 OK)"
+    type: dbt_command
+    command: ["dbt", "parse"]
+    points: 10
+
+  - id: mart-with-int-node-registered
+    description: "manifest に model.local_analytics.mart_compare_with_int が登録されている"
+    type: manifest_node_exists
+    node: model.local_analytics.mart_compare_with_int
+    points: 10
+
+  - id: mart-without-int-node-registered
+    description: "manifest に model.local_analytics.mart_compare_without_int が登録されている"
+    type: manifest_node_exists
+    node: model.local_analytics.mart_compare_without_int
+    points: 10
+
+  # ----- lineage チェック (50 点) -----
+
+  - id: mart-with-int-lineage-via-int
+    description: "mart_compare_with_int の direct upstream に int_order_details_100knock が含まれる (= int を中継)"
+    type: manifest_lineage
+    node: model.local_analytics.mart_compare_with_int
+    upstream_min_count: 1
+    upstream_must_include:
+      - model.local_analytics.int_order_details_100knock
+    points: 25
+
+  - id: mart-without-int-lineage-direct
+    description: "mart_compare_without_int の direct upstream に staging が 4 本以上含まれる (= int を中継しない)"
+    type: manifest_lineage
+    node: model.local_analytics.mart_compare_without_int
+    upstream_min_count: 4
+    upstream_must_include:
+      - model.local_analytics.stg_orders_100knock
+      - model.local_analytics.stg_customers_100knock
+      - model.local_analytics.stg_products_100knock
+      - model.local_analytics.stg_stores_100knock
+    points: 25

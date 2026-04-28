@@ -1,0 +1,89 @@
+# Grading for 100-knock Topic 5 / Q8: schema.yml の meta: で owner / slack_channel / sla_hours を宣言
+# Run: python3 scripts/grader/grade.py --grading-file docs/exercises/100-knock/topic-5-mart/5-8-mart-meta-owner.grading.yaml
+#
+# 採点方針:
+#   - 構造チェック (schema.yml に meta + 3 キー)             45
+#   - parse / docs generate                                  35
+#   - manifest.json の meta フィールド検査                    20
+#   合計 100、合格 80
+
+exercise: 100-knock-5-8-mart-meta-owner
+title: "5-8: mart_top_rated_products_100knock の meta に owner / slack_channel / sla_hours を宣言"
+passing_score: 80
+
+expects_learner_files:
+  - dbt/models/100-knock/topic-5/schema.yml
+
+checks:
+  # ----- 構造チェック (45点) -----
+
+  - id: schema-yml-has-meta-block
+    description: "schema.yml に meta: ブロックが存在する"
+    type: shell_command
+    command: |
+      set -euo pipefail
+      f=dbt/models/100-knock/topic-5/schema.yml
+      test -f "${f}"
+      grep -E '^\s*meta:' "${f}" >/dev/null
+    points: 15
+
+  - id: meta-has-required-keys
+    description: "meta に owner / slack_channel / sla_hours の 3 キーが揃っている"
+    type: shell_command
+    command: |
+      set -euo pipefail
+      f=dbt/models/100-knock/topic-5/schema.yml
+      grep -E '^\s+owner:\s*\S' "${f}" >/dev/null
+      grep -E '^\s+slack_channel:\s*\S' "${f}" >/dev/null
+      grep -E '^\s+sla_hours:\s*\S' "${f}" >/dev/null
+    points: 30
+
+  # ----- parse / docs generate (35点) -----
+
+  - id: dbt-parse-success
+    description: "dbt parse が成功する (meta: の yaml 構文が正しい)"
+    type: dbt_command
+    command: ["dbt", "parse"]
+    points: 15
+
+  - id: dbt-docs-generate-success
+    description: "dbt docs generate が成功し、catalog.json + manifest.json が更新される"
+    type: dbt_command
+    command: ["dbt", "docs", "generate"]
+    points: 20
+
+  # ----- manifest 検査 (20点) -----
+
+  - id: manifest-meta-owner
+    description: "manifest 上で meta.owner が空でない (sql_assert で raw SQL を発行できないので shell + jq で代替)"
+    type: shell_command
+    command: |
+      set -euo pipefail
+      f=dbt/target/manifest.json
+      test -f "${f}"
+      python3 -c "
+      import json, sys
+      m = json.load(open('${f}'))
+      n = m['nodes']['model.local_analytics.mart_top_rated_products_100knock']
+      meta = n.get('meta', {}) or {}
+      assert meta.get('owner'), 'meta.owner missing'
+      print('meta.owner =', meta['owner'])
+      "
+    points: 10
+
+  - id: manifest-meta-sla
+    description: "manifest 上で meta.sla_hours と meta.slack_channel が両方存在する"
+    type: shell_command
+    command: |
+      set -euo pipefail
+      f=dbt/target/manifest.json
+      python3 -c "
+      import json
+      m = json.load(open('${f}'))
+      n = m['nodes']['model.local_analytics.mart_top_rated_products_100knock']
+      meta = n.get('meta', {}) or {}
+      assert meta.get('sla_hours') is not None, 'meta.sla_hours missing'
+      assert meta.get('slack_channel'), 'meta.slack_channel missing'
+      print('sla_hours =', meta['sla_hours'], 'slack_channel =', meta['slack_channel'])
+      "
+    points: 10

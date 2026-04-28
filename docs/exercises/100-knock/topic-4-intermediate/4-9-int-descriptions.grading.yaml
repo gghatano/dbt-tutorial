@@ -1,0 +1,74 @@
+# Grading for 100-knock Topic 4 / Q9: int_order_details_100knock の全列 description を schema.yml に書き、docs カタログ化。
+# Run: python3 scripts/grader/grade.py --grading-file docs/exercises/100-knock/topic-4-intermediate/4-9-int-descriptions.grading.yaml
+
+exercise: 100-knock-4-9-int-descriptions
+title: "4-9: int_order_details_100knock の全列 description を schema.yml に書き、docs カタログ化"
+passing_score: 80
+
+expects_learner_files:
+  - dbt/models/100-knock/topic-4/schema.yml
+
+checks:
+  - id: schema-yml-exists
+    description: "dbt/models/100-knock/topic-4/schema.yml が存在する"
+    type: file_exists
+    path: dbt/models/100-knock/topic-4/schema.yml
+    min_size_bytes: 200
+    points: 10
+
+  - id: description-count-in-schema-yml
+    description: "schema.yml に description: が 12 個以上ある (model 1 + 11 column)"
+    type: shell_command
+    command: |
+      set -euo pipefail
+      n=$(grep -cE '^\s+description:' dbt/models/100-knock/topic-4/schema.yml || echo 0)
+      echo "description_count=${n}"
+      test "${n}" -ge 12
+    points: 20
+
+  - id: dbt-parse-success
+    description: "dbt parse が成功する (schema.yml が文法的に正しい)"
+    type: dbt_command
+    command: ["parse"]
+    points: 15
+
+  - id: dbt-docs-generate-success
+    description: "dbt docs generate が成功する (manifest + catalog を生成)"
+    type: dbt_command
+    command: ["docs", "generate"]
+    points: 15
+
+  - id: model-description-non-empty
+    description: "manifest 上 int_order_details_100knock の model description が非空"
+    type: shell_command
+    command: |
+      set -euo pipefail
+      python3 -c "
+      import json
+      with open('dbt/target/manifest.json') as f:
+          m = json.load(f)
+      node = m['nodes']['model.local_analytics.int_order_details_100knock']
+      desc = (node.get('description') or '').strip()
+      print('model_description=' + repr(desc[:80]))
+      assert desc, 'model description is empty'
+      "
+    points: 15
+
+  - id: all-columns-have-description
+    description: "manifest 上 int_order_details_100knock の全カラムで description が非空 (11 列以上)"
+    type: shell_command
+    command: |
+      set -euo pipefail
+      python3 -c "
+      import json
+      with open('dbt/target/manifest.json') as f:
+          m = json.load(f)
+      node = m['nodes']['model.local_analytics.int_order_details_100knock']
+      cols = node.get('columns', {})
+      print('column count=' + str(len(cols)))
+      empty = [c for c, v in cols.items() if not (v.get('description') or '').strip()]
+      print('empty_description_columns=' + repr(empty))
+      assert len(cols) >= 11, f'expected >=11 columns documented, got {len(cols)}'
+      assert not empty, f'columns without description: {empty}'
+      "
+    points: 25

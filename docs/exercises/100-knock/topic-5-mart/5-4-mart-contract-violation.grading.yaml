@@ -1,0 +1,73 @@
+# Grading definition for 100-knock Topic 5, Problem 5-4
+# (Deliberately violate contract, observe Contract Error, fix it).
+# Run by:
+#   python3 scripts/grader/grade.py \
+#     --grading-file docs/exercises/100-knock/topic-5-mart/5-4-mart-contract-violation.grading.yaml
+#
+# 採点方針:
+#   - 「壊して落ちた」状態は CI で直接 PASS 判定が難しい (build red を expected fail として
+#     扱う表現が grading.yaml に乏しい) ので、以下の代替で評価する:
+#       1. violation-log.md が存在し、Contract Error の記録が含まれること
+#       2. 5-3 で立てた contract: enforced 宣言が schema.yml に維持されていること
+#       3. 学習者が修正済み (= 直した後の dbt run が PASS する) であること
+#   - 「壊して→直す」のサイクル自体は学習体験として md / solution に詳述
+#
+# 前提:
+#   - 5-3 完了 (mart_daily_sales_100knock に contract: enforced と data_type 宣言済み)
+
+exercise: 100-knock-5-4-mart-contract-violation
+title: "100-knock 5-4: mart_daily_sales_100knock の型をわざと変えて Contract Error を体験 → 修復"
+passing_score: 80
+
+expects_learner_files:
+  - docs/exercises/100-knock/topic-5-mart/5-4-violation-log.md
+  - dbt/models/100-knock/topic-5/mart_daily_sales_100knock.sql
+  - dbt/models/100-knock/topic-5/schema.yml
+
+checks:
+  # ----- 学習記録 (35 点) -----
+
+  - id: violation-log-exists
+    description: "5-4-violation-log.md が存在し、内容が 200 bytes 以上ある"
+    type: file_exists
+    path: docs/exercises/100-knock/topic-5-mart/5-4-violation-log.md
+    min_size_bytes: 200
+    points: 15
+
+  - id: violation-log-mentions-contract-error
+    description: "violation-log.md に Contract Error / contract / data type mismatch のいずれかが言及されている"
+    type: shell_command
+    command: |
+      set -euo pipefail
+      n=$(grep -ciE 'contract error|contract|data type mismatch' docs/exercises/100-knock/topic-5-mart/5-4-violation-log.md || echo 0)
+      echo "contract_mentions=${n}"
+      test "${n}" -ge 1
+    points: 20
+
+  # ----- 5-3 契約宣言の維持 (30 点) -----
+
+  - id: contract-still-enforced
+    description: "修復後も config.contract.enforced=true が維持されている (= 安易に契約を外していない)"
+    type: manifest_config
+    node: model.local_analytics.mart_daily_sales_100knock
+    expected:
+      contract.enforced: true
+    points: 30
+
+  # ----- 修復後の build PASS (35 点) -----
+
+  - id: dbt-run-after-fix-passes
+    description: "修復後の dbt run --select mart_daily_sales_100knock が成功する (= 契約と SQL を整合させた)"
+    type: dbt_command
+    command: ["dbt", "run", "--select", "mart_daily_sales_100knock"]
+    points: 25
+
+  - id: violation-log-mentions-fix
+    description: "violation-log.md に「直した」「修復」「fix」「PASS」などの修復の記録がある"
+    type: shell_command
+    command: |
+      set -euo pipefail
+      n=$(grep -ciE '直した|修復|戻した|fix|PASS|ERROR=0' docs/exercises/100-knock/topic-5-mart/5-4-violation-log.md || echo 0)
+      echo "fix_mentions=${n}"
+      test "${n}" -ge 1
+    points: 10
