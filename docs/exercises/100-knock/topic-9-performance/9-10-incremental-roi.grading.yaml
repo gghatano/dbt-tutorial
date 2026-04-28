@@ -1,0 +1,82 @@
+# Grading for 100-knock Topic 9 / Q10: 大規模 incremental vs table の ROI 計測。
+# Run: python3 scripts/grader/grade.py --grading-file docs/exercises/100-knock/topic-9-performance/9-10-incremental-roi.grading.yaml
+#
+# 注意:
+# - 100,000 行生成 → CI で時間がかかる場合は --rows を小さくしても OK (csv_assert は >= 50000 で緩め)
+# - sql_assert は raw.orders_large の行数を見る (>= 50000 で許容)
+
+exercise: 100-knock-9-10-incremental-roi
+title: "9-10: 大規模 (orders 100,000 行) で incremental vs table の ROI を 5 回計測"
+passing_score: 80
+
+expects_learner_files:
+  - scripts/100-knock/topic-9/generate_large_orders.py
+  - scripts/100-knock/topic-9/measure_incremental_roi.py
+  - docs/exercises/100-knock/topic-9-performance/incremental-roi.md
+
+checks:
+  - id: generate-script-exists
+    description: "generate_large_orders.py が存在する (300 bytes 以上)"
+    type: file_exists
+    path: scripts/100-knock/topic-9/generate_large_orders.py
+    min_size_bytes: 300
+    points: 10
+
+  - id: measure-script-exists
+    description: "measure_incremental_roi.py が存在する (300 bytes 以上)"
+    type: file_exists
+    path: scripts/100-knock/topic-9/measure_incremental_roi.py
+    min_size_bytes: 300
+    points: 10
+
+  - id: roi-md-exists
+    description: "incremental-roi.md が存在する (200 bytes 以上)"
+    type: file_exists
+    path: docs/exercises/100-knock/topic-9-performance/incremental-roi.md
+    min_size_bytes: 200
+    points: 10
+
+  - id: large-csv-row-count
+    description: "data/100-knock/topic-9/large_orders.csv が 50,000 行以上 (ヘッダ込み)"
+    type: shell_command
+    command: |
+      set -euo pipefail
+      f=data/100-knock/topic-9/large_orders.csv
+      test -f "$f"
+      n=$(wc -l < "$f")
+      echo "rows_in_csv=${n}"
+      test "${n}" -ge 50000
+    points: 20
+
+  - id: raw-orders-large-row-count
+    description: "raw.orders_large テーブルに 50,000 行以上 (incremental の入力源)"
+    type: sql_assert
+    sql: "select count(*) from raw.orders_large"
+    op: gte
+    expected: 50000
+    points: 20
+
+  - id: roi-md-mentions-speedup
+    description: "incremental-roi.md に「倍速」または「times faster」表現がある"
+    type: shell_command
+    command: |
+      set -euo pipefail
+      doc=docs/exercises/100-knock/topic-9-performance/incremental-roi.md
+      n=$(grep -cE '倍速|times faster|x faster' "$doc" || echo 0)
+      echo "speedup_mentions=${n}"
+      test "${n}" -ge 1
+    points: 15
+
+  - id: roi-md-has-measurement-table
+    description: "incremental-roi.md に 5 回計測の表 (run 1〜5 / 秒数の数値) がある"
+    type: shell_command
+    command: |
+      set -euo pipefail
+      doc=docs/exercises/100-knock/topic-9-performance/incremental-roi.md
+      # 「run」または「1 回目」のような行が複数 + 秒数表記
+      n_runs=$(grep -cE '(run\s*[1-5]|[1-5]\s*回目)' "$doc" || echo 0)
+      n_secs=$(grep -cE '[0-9]+\.[0-9]+\s*s' "$doc" || echo 0)
+      echo "runs_mentions=${n_runs} secs_mentions=${n_secs}"
+      test "${n_runs}" -ge 3
+      test "${n_secs}" -ge 3
+    points: 15
