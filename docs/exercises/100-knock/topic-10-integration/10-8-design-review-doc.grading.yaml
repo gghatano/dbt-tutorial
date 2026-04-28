@@ -1,0 +1,87 @@
+# Grading definition for 100-knock Topic 10, Problem 10-8 (open-ended)
+# (Self design review doc with ER, DAG, SLA, and 3+ design decisions)
+# Run by:
+#   python3 scripts/grader/grade.py \
+#     --grading-file docs/exercises/100-knock/topic-10-integration/10-8-design-review-doc.grading.yaml
+#
+# 採点方針 (open-ended 問の方針):
+#   - 「書かれていれば部分点」、内容質より仕組み
+#   - 評価は人手前提、CI は形式のみ確認
+#   - file_exists + 必須セクション grep + 文字数 + キーワード grep の機械的チェック
+
+exercise: 100-knock-10-8-design-review-doc
+title: "100-knock 10-8 (open-ended): 自分の DAG 設計を design_review.md にまとめる"
+passing_score: 80
+
+expects_learner_files:
+  - docs/exercises/100-knock/topic-10-integration/learner/design_review.md
+
+checks:
+  # ----- file 存在 + 最低サイズ (20 点) -----
+
+  - id: design-review-md-exists
+    description: "learner/design_review.md が存在する (最低 200 byte)"
+    type: file_exists
+    path: docs/exercises/100-knock/topic-10-integration/learner/design_review.md
+    min_size_bytes: 200
+    points: 20
+
+  # ----- 必須セクション 4 つの見出し grep (40 点) -----
+
+  - id: section-er
+    description: "## ER 図 (または ER) の見出しがある"
+    type: shell_command
+    command: |
+      set -euo pipefail
+      grep -qE '^##\s+ER' docs/exercises/100-knock/topic-10-integration/learner/design_review.md
+    points: 10
+
+  - id: section-dag
+    description: "## DAG の見出しがある"
+    type: shell_command
+    command: |
+      set -euo pipefail
+      grep -qE '^##\s+DAG' docs/exercises/100-knock/topic-10-integration/learner/design_review.md
+    points: 10
+
+  - id: section-sla
+    description: "## SLA の見出しがある"
+    type: shell_command
+    command: |
+      set -euo pipefail
+      grep -qE '^##\s+SLA' docs/exercises/100-knock/topic-10-integration/learner/design_review.md
+    points: 10
+
+  - id: section-design-decision
+    description: "## 設計判断 (または 設計判断 を含む見出し) がある"
+    type: shell_command
+    command: |
+      set -euo pipefail
+      grep -qE '^##.*設計判断' docs/exercises/100-knock/topic-10-integration/learner/design_review.md
+    points: 10
+
+  # ----- 文字数 1500 以上 (20 点) -----
+
+  - id: min-char-1500
+    description: "本文の文字数が 1500 以上"
+    type: shell_command
+    command: |
+      set -euo pipefail
+      n=$(wc -m < docs/exercises/100-knock/topic-10-integration/learner/design_review.md | tr -d ' ')
+      echo "char_count=${n}"
+      test "${n}" -ge 1500
+    points: 20
+
+  # ----- 「迷った」「判断」キーワード合計 3 つ以上 (20 点) -----
+
+  - id: keyword-design-decisions
+    description: "本文中に「迷った」「判断」のキーワードが合計 3 回以上"
+    type: shell_command
+    command: |
+      set -euo pipefail
+      n_mayoi=$(grep -o '迷った' docs/exercises/100-knock/topic-10-integration/learner/design_review.md | wc -l | tr -d ' ')
+      n_handan=$(grep -o '判断' docs/exercises/100-knock/topic-10-integration/learner/design_review.md | wc -l | tr -d ' ')
+      total=$((n_mayoi + n_handan))
+      echo "mayoi=${n_mayoi} handan=${n_handan} total=${total}"
+      test "${total}" -ge 3
+    points: 20
