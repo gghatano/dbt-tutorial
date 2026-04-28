@@ -1,0 +1,67 @@
+# Grading for 100-knock Topic 2 / Q10: pre-build runbook (generate → load → freshness → build).
+# Run: python3 scripts/grader/grade.py --grading-file docs/exercises/100-knock/topic-2-raw-load/2-10-runbook.grading.yaml
+
+exercise: 100-knock-2-10-runbook
+title: "2-10: 投入スクリプトを pre-hook 風に手動順序化し runbook 化"
+passing_score: 80
+
+expects_learner_files:
+  - docs/exercises/100-knock/topic-2-raw-load/runbook.md
+
+checks:
+  - id: runbook-file-exists
+    description: "runbook.md が存在する (>= 500 bytes)"
+    type: file_exists
+    path: docs/exercises/100-knock/topic-2-raw-load/runbook.md
+    min_size_bytes: 500
+    points: 15
+
+  - id: runbook-mentions-generate
+    description: "runbook 内に 'generate' 手順への言及がある"
+    type: shell_command
+    command: |
+      set -euo pipefail
+      grep -iE "generate" docs/exercises/100-knock/topic-2-raw-load/runbook.md > /dev/null
+    points: 15
+
+  - id: runbook-mentions-load
+    description: "runbook 内に 'load' 手順への言及がある"
+    type: shell_command
+    command: |
+      set -euo pipefail
+      grep -iE "\bload" docs/exercises/100-knock/topic-2-raw-load/runbook.md > /dev/null
+    points: 15
+
+  - id: runbook-mentions-freshness
+    description: "runbook 内に 'freshness' (= dbt source freshness) への言及がある"
+    type: shell_command
+    command: |
+      set -euo pipefail
+      grep -iE "freshness" docs/exercises/100-knock/topic-2-raw-load/runbook.md > /dev/null
+    points: 20
+
+  - id: runbook-mentions-dbt-build
+    description: "runbook 内に 'dbt build' への言及がある"
+    type: shell_command
+    command: |
+      set -euo pipefail
+      grep -E "dbt build" docs/exercises/100-knock/topic-2-raw-load/runbook.md > /dev/null
+    points: 15
+
+  - id: runbook-mentions-pre-hook
+    description: "runbook 内に 'pre-hook' への言及がある (= dbt の pre-hook と本 runbook の違いに触れている)"
+    type: shell_command
+    command: |
+      set -euo pipefail
+      grep -iE "pre[- ]?hook" docs/exercises/100-knock/topic-2-raw-load/runbook.md > /dev/null
+    points: 10
+
+  - id: runbook-has-ordered-steps
+    description: "runbook に番号付きステップ (1. / 2. / 3. / 4. のいずれか複数) が書かれている"
+    type: shell_command
+    command: |
+      set -euo pipefail
+      n=$(grep -cE "^\s*(###?\s+)?[1-4][\.)]" docs/exercises/100-knock/topic-2-raw-load/runbook.md || true)
+      echo "ordered_step_lines=${n}"
+      test "${n}" -ge 3
+    points: 10

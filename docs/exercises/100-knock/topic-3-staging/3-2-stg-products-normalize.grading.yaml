@@ -1,0 +1,64 @@
+# Grading definition for 100-knock Topic 3, Problem 3-2 (stg_products + category normalize).
+# Run by: python scripts/grader/grade.py --grading-file docs/exercises/100-knock/topic-3-staging/3-2-stg-products-normalize.grading.yaml
+#
+# 採点方針:
+#   - 構造チェック (file_exists / parse / manifest) で 45 点
+#   - データチェック (sql_assert で正規化検証 + dbt_test_passes) で 55 点
+#
+# 前提:
+#   - 3-1 完了 (stg_customers_100knock + 100-knock/topic-3/schema.yml が存在)
+#   - Topic ② 2-1〜2-5 完了 (raw_100knock.products source が宣言済み, raw.products に 100 行)
+
+exercise: 100-knock-3-2-stg-products-normalize
+title: "100-knock 3-2: stg_products で category 列を正規化"
+passing_score: 80
+
+expects_learner_files:
+  - dbt/models/100-knock/topic-3/stg_products_100knock.sql
+  - dbt/models/100-knock/topic-3/schema.yml
+
+checks:
+  # ----- 構造チェック (45 点) -----
+
+  - id: stg-products-file-exists
+    description: "dbt/models/100-knock/topic-3/stg_products_100knock.sql が存在する"
+    type: file_exists
+    path: dbt/models/100-knock/topic-3/stg_products_100knock.sql
+    points: 15
+
+  - id: parse-success
+    description: "dbt parse が成功する (新 model の SQL / Jinja 構文 OK)"
+    type: dbt_command
+    command: ["dbt", "parse"]
+    points: 10
+
+  - id: stg-products-node-registered
+    description: "manifest に model.local_analytics.stg_products_100knock が登録されている"
+    type: manifest_node_exists
+    node: model.local_analytics.stg_products_100knock
+    points: 20
+
+  # ----- データチェック (55 点) -----
+
+  - id: stg-products-row-count
+    description: "staging.stg_products_100knock が 100 行ある (Topic ① 1-2 の生成行数)"
+    type: sql_assert
+    sql: "SELECT count(*) FROM staging.stg_products_100knock"
+    op: eq
+    expected: 100
+    points: 15
+
+  - id: category-normalized
+    description: "category 列に表記揺れがない (lower(trim(...)) が効いている: violation 行数 == 0)"
+    type: sql_assert
+    sql: "SELECT count(*) FROM staging.stg_products_100knock WHERE category != lower(trim(category))"
+    op: eq
+    expected: 0
+    points: 25
+
+  - id: stg-products-tests-pass
+    description: "dbt test --select stg_products_100knock が PASS (not_null / unique など)"
+    type: dbt_test_passes
+    select: stg_products_100knock
+    min_pass: 3
+    points: 15

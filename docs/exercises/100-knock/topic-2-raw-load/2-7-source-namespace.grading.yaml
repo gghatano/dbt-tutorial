@@ -1,0 +1,66 @@
+# Grading for 100-knock Topic 2 / Q7: alternate source namespace (raw_alt).
+# Run: python3 scripts/grader/grade.py --grading-file docs/exercises/100-knock/topic-2-raw-load/2-7-source-namespace.grading.yaml
+
+exercise: 100-knock-2-7-source-namespace
+title: "2-7: 別名 source (raw_alt) を追加して名前空間衝突を回避する"
+passing_score: 80
+
+expects_learner_files:
+  - dbt/models/100-knock/topic-2/sources_alt.yml
+
+checks:
+  - id: sources-alt-file-exists
+    description: "sources_alt.yml が存在する"
+    type: file_exists
+    path: dbt/models/100-knock/topic-2/sources_alt.yml
+    min_size_bytes: 100
+    points: 15
+
+  - id: sources-alt-declares-raw-alt
+    description: "sources_alt.yml に name: raw_alt が宣言されている"
+    type: shell_command
+    command: |
+      set -euo pipefail
+      grep -E "^\s*-\s*name:\s*raw_alt\s*$" dbt/models/100-knock/topic-2/sources_alt.yml
+    points: 15
+
+  - id: sources-alt-uses-raw-schema
+    description: "sources_alt.yml の raw_alt が schema: raw を指している (同じ物理)"
+    type: shell_command
+    command: |
+      set -euo pipefail
+      grep -E "^\s*schema:\s*raw\s*$" dbt/models/100-knock/topic-2/sources_alt.yml
+    points: 10
+
+  - id: sources-alt-has-4-tables
+    description: "raw_alt 配下に 4 テーブル (customers/products/stores/orders) が宣言されている"
+    type: shell_command
+    command: |
+      set -euo pipefail
+      n=0
+      for t in customers products stores orders; do
+        if grep -E "^\s*-\s*name:\s*${t}\s*$" dbt/models/100-knock/topic-2/sources_alt.yml > /dev/null; then
+          n=$((n + 1))
+        fi
+      done
+      echo "tables_found=${n}"
+      test "${n}" -ge 4
+    points: 15
+
+  - id: dbt-parse-passes
+    description: "dbt parse が成功する (sources_alt.yml の構文エラー無し / 既存 source と衝突しない)"
+    type: dbt_command
+    command: ["dbt", "parse"]
+    points: 20
+
+  - id: manifest-raw-alt-customers-exists
+    description: "manifest に source.local_analytics.raw_alt.customers が登録されている"
+    type: manifest_node_exists
+    node: source.local_analytics.raw_alt.customers
+    points: 15
+
+  - id: manifest-raw-alt-orders-exists
+    description: "manifest に source.local_analytics.raw_alt.orders が登録されている"
+    type: manifest_node_exists
+    node: source.local_analytics.raw_alt.orders
+    points: 10

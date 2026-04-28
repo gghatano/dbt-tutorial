@@ -1,0 +1,54 @@
+# Grading for 100-knock Topic 2 / Q1: load 4 raw tables via psycopg COPY.
+# Run: python3 scripts/grader/grade.py --grading-file docs/exercises/100-knock/topic-2-raw-load/2-1-raw-load.grading.yaml
+
+exercise: 100-knock-2-1-raw-load
+title: "2-1: raw schema を作って 4 テーブルを CSV から COPY 投入する"
+passing_score: 80
+
+expects_learner_files:
+  - scripts/100-knock/topic-2/load_raw.py
+
+checks:
+  - id: script-exists
+    description: "学習者が scripts/100-knock/topic-2/load_raw.py を作成した"
+    type: file_exists
+    path: scripts/100-knock/topic-2/load_raw.py
+    points: 10
+
+  - id: script-runs
+    description: "スクリプト実行が成功する (exit 0)"
+    type: shell_command
+    command: ["python3", "scripts/100-knock/topic-2/load_raw.py"]
+    points: 20
+
+  - id: customers-row-count
+    description: "raw.customers が 1000 行ロードされている"
+    type: sql_assert
+    sql: "SELECT count(*) FROM raw.customers"
+    op: eq
+    expected: 1000
+    points: 15
+
+  - id: products-row-count
+    description: "raw.products が 100 行ロードされている"
+    type: sql_assert
+    sql: "SELECT count(*) FROM raw.products"
+    op: eq
+    expected: 100
+    points: 15
+
+  - id: stores-row-count
+    description: "raw.stores が 20 行ロードされている"
+    type: sql_assert
+    sql: "SELECT count(*) FROM raw.stores"
+    op: eq
+    expected: 20
+    points: 15
+
+  - id: orders-row-count
+    description: "raw.orders が 10000 行ロードされている"
+    type: sql_assert
+    sql: "SELECT count(*) FROM raw.orders"
+    op: eq
+    expected: 10000
+    points: 25

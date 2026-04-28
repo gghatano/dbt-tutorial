@@ -1,0 +1,62 @@
+# Grading for 100-knock Topic 3 / Q9: dbt run --select +stg_orders_100knock+ で DAG 演算子を確認。
+# Run: python3 scripts/grader/grade.py --grading-file docs/exercises/100-knock/topic-3-staging/3-9-dag-selector.grading.yaml
+#
+# 注: Topic ④ (intermediate) 未着手なら下流は無いので、source + 自身の 2 ノードでも合格とする。
+
+exercise: 100-knock-3-9-dag-selector
+title: "3-9: dbt run --select +stg_orders_100knock+ で DAG 演算子の挙動を確認"
+passing_score: 80
+
+expects_learner_files:
+  - docs/exercises/100-knock/topic-3-staging/dag-traversal.md
+
+checks:
+  - id: dag-traversal-md-exists
+    description: "学習者が dag-traversal.md を作成した"
+    type: file_exists
+    path: docs/exercises/100-knock/topic-3-staging/dag-traversal.md
+    min_size_bytes: 200
+    points: 15
+
+  - id: dbt-ls-with-bidirectional-selector
+    description: "dbt ls --select +stg_orders_100knock+ が成功し、最低 1 ノード返す"
+    type: shell_command
+    command: |
+      set -euo pipefail
+      cd dbt
+      out=$(dbt ls --select +stg_orders_100knock+ --profiles-dir . 2>&1 | tail -n 50)
+      echo "${out}"
+      echo "${out}" | grep -E 'stg_orders_100knock' >/dev/null
+    points: 25
+
+  - id: dbt-ls-includes-upstream-source
+    description: "dbt ls --select +stg_orders_100knock で上流 source (raw_100knock.orders) が出てくる"
+    type: shell_command
+    command: |
+      set -euo pipefail
+      cd dbt
+      out=$(dbt ls --select +stg_orders_100knock --resource-type source --profiles-dir . 2>&1 | tail -n 50)
+      echo "${out}"
+      echo "${out}" | grep -E 'raw_100knock\.orders|raw_100knock_orders' >/dev/null
+    points: 25
+
+  - id: dbt-build-impact-range
+    description: "dbt build --select +stg_orders_100knock+ が成功する (model + test が PASS)"
+    type: shell_command
+    command: |
+      set -euo pipefail
+      cd dbt
+      dbt build --select +stg_orders_100knock+ --profiles-dir . 2>&1 | tee /tmp/3-9-build.log
+      grep -E 'Done\.|Completed successfully' /tmp/3-9-build.log >/dev/null
+      ! grep -E 'ERROR=[1-9]' /tmp/3-9-build.log >/dev/null
+    points: 25
+
+  - id: doc-mentions-selector-syntax
+    description: "dag-traversal.md に DAG 演算子 (+stg_orders_100knock+ など) の言及がある"
+    type: shell_command
+    command: |
+      set -euo pipefail
+      n=$(grep -cE '\+stg_orders_100knock|stg_orders_100knock\+' docs/exercises/100-knock/topic-3-staging/dag-traversal.md || echo 0)
+      echo "selector_mentions=${n}"
+      test "${n}" -ge 1
+    points: 10
