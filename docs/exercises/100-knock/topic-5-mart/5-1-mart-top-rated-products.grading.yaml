@@ -1,0 +1,66 @@
+# Grading definition for 100-knock Topic 5, Problem 5-1
+# (mart_top_rated_products_100knock with grain + business filter declarations).
+# Run by:
+#   python3 scripts/grader/grade.py \
+#     --grading-file docs/exercises/100-knock/topic-5-mart/5-1-mart-top-rated-products.grading.yaml
+#
+# 採点方針:
+#   - 構造チェック (file_exists / manifest_node / manifest_lineage) で 50 点
+#   - データチェック (dbt_test / sql_assert で WHERE フィルタが効いていること) で 50 点
+#
+# 前提:
+#   - Topic ② ③ ④ 完了
+#       (stg_products_100knock, int_product_reviews_100knock が存在)
+#   - main HEAD の MVP mart_product_sales が build 済み (上流参照対象)
+#   - 学習者は dbt/models/100-knock/topic-5/mart_top_rated_products_100knock.sql
+#     と schema.yml を作成済み
+
+exercise: 100-knock-5-1-mart-top-rated-products
+title: "100-knock 5-1: mart_top_rated_products_100knock を grain + 業務しきい値の宣言付きで再構築"
+passing_score: 80
+
+expects_learner_files:
+  - dbt/models/100-knock/topic-5/mart_top_rated_products_100knock.sql
+  - dbt/models/100-knock/topic-5/schema.yml
+
+checks:
+  # ----- 構造チェック (50 点) -----
+
+  - id: mart-file-exists
+    description: "dbt/models/100-knock/topic-5/mart_top_rated_products_100knock.sql が存在する"
+    type: file_exists
+    path: dbt/models/100-knock/topic-5/mart_top_rated_products_100knock.sql
+    points: 10
+
+  - id: mart-node-registered
+    description: "manifest に model.local_analytics.mart_top_rated_products_100knock が登録されている"
+    type: manifest_node_exists
+    node: model.local_analytics.mart_top_rated_products_100knock
+    points: 15
+
+  - id: mart-lineage-includes-int-product-reviews
+    description: "mart の上流に int_product_reviews_100knock と mart_product_sales が含まれる (依存階層を守れている)"
+    type: manifest_lineage
+    node: model.local_analytics.mart_top_rated_products_100knock
+    upstream_min_count: 2
+    upstream_must_include:
+      - model.local_analytics.int_product_reviews_100knock
+      - model.local_analytics.mart_product_sales
+    points: 25
+
+  # ----- データチェック (50 点) -----
+
+  - id: mart-tests-pass
+    description: "dbt test --select mart_top_rated_products_100knock が PASS (PK + not_null 群)"
+    type: dbt_test_passes
+    select: mart_top_rated_products_100knock
+    min_pass: 2
+    points: 20
+
+  - id: mart-business-filter-applied
+    description: "business filter (avg_rating>=4 AND review_count>=10) が効いている (違反 0 行)"
+    type: sql_assert
+    sql: "SELECT count(*) FROM marts.mart_top_rated_products_100knock WHERE avg_rating < 4.0 OR review_count < 10"
+    op: eq
+    expected: 0
+    points: 30

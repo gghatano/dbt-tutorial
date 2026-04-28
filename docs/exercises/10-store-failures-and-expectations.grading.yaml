@@ -1,0 +1,72 @@
+# Grading definition for Exercise 10 (--store-failures + dbt-expectations).
+# Run by: python scripts/grader/grade.py --exercise 10
+#
+# 採点方針:
+#   - 構造チェック (packages.yml / schema.yml / dbt_packages) で 50 点
+#   - 動作チェック (dbt deps + dbt test PASS or WARN) で 50 点
+#   - severity: warn を使った場合 dbt test の exit code は 0 のままなので
+#     dbt_test_passes は WARN を含めて PASS 判定する (実装は ERROR>0 のみ NG)。
+#
+# 前提 / 注意:
+#   - 本演習は Exercise 07 (dbt_utils) に**依存**する。packages.yml で
+#     dbt_utils と dbt_expectations が両方宣言されている前提。dbt_utils が
+#     入っていないと dbt_expectations も install されない。
+#   - 本演習は Exercise 01 (raw.reviews + stg_reviews) にも依存する。stg_reviews
+#     が無いと expect_column_values_to_be_between の対象が無い。
+#   - dbt_packages/ は通常 .gitignore に入るが、grader は CI 上で
+#     "dbt deps が走った後" にチェックを実行する想定。よって dbt_packages の
+#     存在確認は dbt deps 実行後に効く。
+#   - severity: warn にしておけば、stg_reviews の rating に異常値が混じっていても
+#     test は WARN のみで dbt test exit 0。よって grading の dbt_test_passes も
+#     PASS 判定可能。学習者が severity 設定を外して ERROR で落としたら
+#     dbt_test_passes は NG になる (これは正しい採点動作)。
+
+exercise: 10-store-failures-and-expectations
+title: "Exercise 10: 失敗行を追跡する (--store-failures + dbt-expectations)"
+passing_score: 80   # need >= 80% of total points to PASS
+
+expects_learner_files:
+  - dbt/models/exercises/10/schema.yml
+  - dbt/packages.yml   # Exercise 07 で作成済みのはず。dbt_expectations を追記する
+
+checks:
+  # ----- 構造チェック (50点) -----
+
+  - id: parse-success
+    description: "dbt parse が成功する (schema.yml の test 定義 + dbt-expectations 参照 OK)"
+    type: dbt_command
+    command: ["dbt", "parse"]
+    points: 10
+
+  - id: exercise-10-schema-file-exists
+    description: "dbt/models/exercises/10/schema.yml が存在する"
+    type: file_exists
+    path: dbt/models/exercises/10/schema.yml
+    points: 15
+
+  - id: dbt-deps-success
+    description: "dbt deps が成功する (packages.yml の dbt_expectations が install 可能)"
+    type: dbt_command
+    command: ["dbt", "deps"]
+    points: 10
+
+  - id: dbt-expectations-installed
+    description: "dbt deps 後、dbt/dbt_packages/dbt_expectations/ が存在する"
+    type: file_exists
+    path: dbt/dbt_packages/dbt_expectations
+    points: 15
+
+  # ----- 動作チェック (50点) -----
+
+  - id: stg-reviews-tests-pass-or-warn
+    description: "stg_reviews の追加 test (accepted_values + expect_column_values_to_be_between) が ERROR にならない (PASS or WARN)"
+    type: dbt_test_passes
+    select: stg_reviews
+    min_pass: 1
+    points: 30
+
+  - id: dbt-utils-still-installed
+    description: "依存 (Exercise 07) の dbt_utils も引き続き install 済み"
+    type: file_exists
+    path: dbt/dbt_packages/dbt_utils
+    points: 20

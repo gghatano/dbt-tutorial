@@ -1,0 +1,88 @@
+# Grading for 100-knock Topic 5 / Q10: int_order_details_100knock v2 を ref する新 mart 並走
+# Run: python3 scripts/grader/grade.py --grading-file docs/exercises/100-knock/topic-5-mart/5-10-mart-version-parallel.grading.yaml
+#
+# 採点方針:
+#   - 構造チェック (file_exists + v=2 ref が SQL に書かれている) 35
+#   - dbt parse + manifest_node_exists                            25
+#   - dbt build PASS                                              20
+#   - SQL 検証 (税込 > 税抜)                                      15
+#   - 旧 mart も残っている (並走確認)                              5
+#   合計 100、合格 80
+
+exercise: 100-knock-5-10-mart-version-parallel
+title: "5-10: mart_daily_sales_with_tax_100knock を新規作成、int_order_details_100knock v2 を参照"
+passing_score: 80
+
+expects_learner_files:
+  - dbt/models/100-knock/topic-5/mart_daily_sales_with_tax_100knock.sql
+
+checks:
+  # ----- 構造チェック (35点) -----
+
+  - id: mart-sql-exists
+    description: "mart_daily_sales_with_tax_100knock.sql が存在する"
+    type: file_exists
+    path: dbt/models/100-knock/topic-5/mart_daily_sales_with_tax_100knock.sql
+    min_size_bytes: 100
+    points: 15
+
+  - id: sql-uses-v2-ref
+    description: "SQL 内で {{ ref('int_order_details_100knock', v=2) }} を使っている (v=2 または version=2)"
+    type: shell_command
+    command: |
+      set -euo pipefail
+      f=dbt/models/100-knock/topic-5/mart_daily_sales_with_tax_100knock.sql
+      # ref('int_order_details_100knock', v=2) または version=2 を許容
+      grep -E "ref\(\s*['\"]int_order_details_100knock['\"]\s*,\s*v(ersion)?\s*=\s*2\s*\)" "${f}" >/dev/null
+    points: 20
+
+  # ----- parse / manifest (25点) -----
+
+  - id: dbt-parse-success
+    description: "dbt parse が成功する (v=2 ref が解決できる = Topic ④ 4-10 で v2 が宣言済み)"
+    type: dbt_command
+    command: ["dbt", "parse"]
+    points: 10
+
+  - id: manifest-node-exists
+    description: "manifest に mart_daily_sales_with_tax_100knock node が登録されている"
+    type: manifest_node_exists
+    node: model.local_analytics.mart_daily_sales_with_tax_100knock
+    points: 15
+
+  # ----- 動作チェック (20点) -----
+
+  - id: dbt-build-mart-success
+    description: "dbt build --select mart_daily_sales_with_tax_100knock が PASS"
+    type: shell_command
+    command: |
+      set -euo pipefail
+      cd dbt
+      dbt build --select mart_daily_sales_with_tax_100knock --profiles-dir . 2>&1 | tee /tmp/5-10-build.log
+      grep -E 'ERROR=0' /tmp/5-10-build.log >/dev/null
+      ! grep -E 'ERROR=[1-9]' /tmp/5-10-build.log >/dev/null
+    points: 20
+
+  # ----- SQL 検証 (15点): 税込列が税抜より大きい -----
+
+  - id: tax-column-greater-than-amount
+    description: "全行で total_sales_amount_with_tax > total_sales_amount (税込 > 税抜)"
+    type: sql_assert
+    sql: |
+      SELECT count(*)::int FROM marts.mart_daily_sales_with_tax_100knock
+      WHERE NOT (total_sales_amount_with_tax > total_sales_amount)
+    op: eq
+    expected: 0
+    points: 15
+
+  # ----- 並走確認 (5点): 旧 mart も残っている -----
+
+  - id: old-mart-still-exists
+    description: "旧 mart_daily_sales_100knock も marts schema に並走している (並走移行の検証)"
+    type: sql_assert
+    sql: |
+      SELECT count(*)::int FROM information_schema.tables
+      WHERE table_schema='marts' AND table_name='mart_daily_sales_100knock'
+    op: eq
+    expected: 1
+    points: 5

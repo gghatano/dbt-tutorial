@@ -1,0 +1,71 @@
+# Grading for 100-knock Topic 1 / Q9: --rows / --date CLI + per-date idempotent output.
+# Run: python3 scripts/grader/grade.py --grading-file docs/exercises/100-knock/topic-1-data-generation/1-9-cli-args.grading.yaml
+
+exercise: 100-knock-1-9-cli-args
+title: "1-9: 生成スクリプトに --rows / --date 引数を追加、複数日分を冪等に再生成"
+passing_score: 80
+
+expects_learner_files:
+  - scripts/100-knock/topic-1/generate_1_9_orders_cli.py
+
+checks:
+  - id: script-exists
+    description: "学習者が generate_1_9_orders_cli.py を作成した"
+    type: file_exists
+    path: scripts/100-knock/topic-1/generate_1_9_orders_cli.py
+    points: 10
+
+  - id: script-runs-with-args
+    description: "--date 2026-04-15 --rows 500 で実行が成功する (exit 0)"
+    type: shell_command
+    command:
+      - "python3"
+      - "scripts/100-knock/topic-1/generate_1_9_orders_cli.py"
+      - "--date"
+      - "2026-04-15"
+      - "--rows"
+      - "500"
+    points: 15
+
+  - id: csv-row-count-500
+    description: "data/100-knock/topic-1/orders_2026-04-15.csv が 500 データ行 + ヘッダ"
+    type: csv_assert
+    path: data/100-knock/topic-1/orders_2026-04-15.csv
+    expect_rows: 500
+    points: 20
+
+  - id: idempotent-md5
+    description: "同じ引数で 2 回呼ぶと出力 CSV の md5sum が完全一致する (バイト同一)"
+    type: shell_command
+    command: |
+      set -euo pipefail
+      python3 scripts/100-knock/topic-1/generate_1_9_orders_cli.py --date 2026-04-15 --rows 500 > /dev/null
+      cp data/100-knock/topic-1/orders_2026-04-15.csv /tmp/orders_2026-04-15.first.csv
+      python3 scripts/100-knock/topic-1/generate_1_9_orders_cli.py --date 2026-04-15 --rows 500 > /dev/null
+      cp data/100-knock/topic-1/orders_2026-04-15.csv /tmp/orders_2026-04-15.second.csv
+      uniq_count=$(md5sum /tmp/orders_2026-04-15.first.csv /tmp/orders_2026-04-15.second.csv | awk '{print $1}' | sort -u | wc -l)
+      echo "uniq_md5_count=${uniq_count}"
+      test "${uniq_count}" -eq 1
+    points: 30
+
+  - id: per-date-separate-files
+    description: "異なる --date を渡すと別ファイルが出力される (orders_*.csv が 2 件以上)"
+    type: shell_command
+    command: |
+      set -euo pipefail
+      python3 scripts/100-knock/topic-1/generate_1_9_orders_cli.py --date 2026-04-16 --rows 500 > /dev/null
+      n=$(ls data/100-knock/topic-1/orders_*.csv 2>/dev/null | wc -l)
+      echo "orders_files=${n}"
+      test "${n}" -ge 2
+    points: 15
+
+  - id: rows-arg-respected
+    description: "--rows 100 を渡すと出力 CSV のデータ行数が 100 になる"
+    type: shell_command
+    command: |
+      set -euo pipefail
+      python3 scripts/100-knock/topic-1/generate_1_9_orders_cli.py --date 2026-04-17 --rows 100 > /dev/null
+      lines=$(wc -l < data/100-knock/topic-1/orders_2026-04-17.csv)
+      echo "lines=${lines}"
+      test "${lines}" -eq 101
+    points: 10

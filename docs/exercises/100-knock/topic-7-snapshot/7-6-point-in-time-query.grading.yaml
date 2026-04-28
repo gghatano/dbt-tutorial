@@ -1,0 +1,69 @@
+# Grading for 100-knock Topic 7 / Q6: point-in-time クエリで as_of=2026-04-15 を再現。
+# Run: python3 scripts/grader/grade.py --grading-file docs/exercises/100-knock/topic-7-snapshot/7-6-point-in-time-query.grading.yaml
+#
+# 前提: 7-1〜7-5 完了。snapshots.snap_products_100knock が v1+v2 = 120 行ある状態。
+
+exercise: 100-knock-7-6-point-in-time-query
+title: "7-6: 過去のある時点を SQL 1 本で再現する"
+passing_score: 80
+
+expects_learner_files:
+  - docs/exercises/100-knock/topic-7-snapshot/point-in-time-result.md
+
+checks:
+  - id: result-md-exists
+    description: "point-in-time-result.md が存在する (300 bytes 以上)"
+    type: file_exists
+    path: docs/exercises/100-knock/topic-7-snapshot/point-in-time-result.md
+    min_size_bytes: 300
+    points: 15
+
+  - id: result-md-mentions-sql
+    description: "result.md に snap_products_100knock への SELECT が記録されている"
+    type: shell_command
+    command: |
+      set -euo pipefail
+      doc=docs/exercises/100-knock/topic-7-snapshot/point-in-time-result.md
+      grep -qE 'snap_products_100knock' "$doc"
+      grep -qE 'dbt_valid_from' "$doc"
+      grep -qE 'dbt_valid_to'   "$doc"
+      echo "result.md mentions snapshot meta cols"
+    points: 15
+
+  - id: result-md-mentions-asof-date
+    description: "result.md に as_of 日付 '2026-04-15' が含まれる"
+    type: shell_command
+    command: |
+      set -euo pipefail
+      grep -qE '2026-04-15' docs/exercises/100-knock/topic-7-snapshot/point-in-time-result.md
+      echo "as_of date present"
+    points: 10
+
+  - id: pit-query-returns-100-rows
+    description: "同等の point-in-time クエリを直接実行して 100 行返る"
+    type: sql_assert
+    sql: |
+      SELECT count(*)::int
+      FROM snapshots.snap_products_100knock
+      WHERE dbt_valid_from <= '2026-04-15'
+        AND ('2026-04-15' < dbt_valid_to OR dbt_valid_to IS NULL)
+    op: eq
+    expected: 100
+    points: 35
+
+  - id: pit-query-grain-unique-per-product
+    description: "as_of=2026-04-15 時点で 1 product に対する有効行が 1 つに絞れている (重複なし)"
+    type: sql_assert
+    sql: |
+      SELECT count(*)::int
+      FROM (
+        SELECT product_id
+        FROM snapshots.snap_products_100knock
+        WHERE dbt_valid_from <= '2026-04-15'
+          AND ('2026-04-15' < dbt_valid_to OR dbt_valid_to IS NULL)
+        GROUP BY product_id
+        HAVING count(*) > 1
+      ) dup
+    op: eq
+    expected: 0
+    points: 25

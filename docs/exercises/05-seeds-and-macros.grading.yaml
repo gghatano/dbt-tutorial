@@ -1,0 +1,67 @@
+# Grading definition for Exercise 05 (seed + macro).
+# Run by: python scripts/grader/grade.py --exercise 05
+#
+# CI 前提:
+#   - `dbt seed --select prefectures` が dbt build 経由で走り、
+#     staging.prefectures に 47 行ロード済みの状態。
+#   - cast_jpy macro を使う mart_regional_sales も dbt build で作成済み。
+
+exercise: 05-seeds-and-macros
+title: "Exercise 05: 都道府県マスタを seed 化、共通 macro を作る"
+passing_score: 80   # need >= 80% of total points to PASS
+
+expects_learner_files:
+  - dbt/seeds/exercises/prefectures.csv
+  - dbt/macros/exercises/cast_jpy.sql
+
+checks:
+  # ----- structural -----
+
+  - id: parse-success
+    description: "dbt parse が成功する (seed/macro/model の構文 OK)"
+    type: dbt_command
+    command: ["dbt", "parse"]
+    points: 10
+
+  - id: seed-csv-exists
+    description: "dbt/seeds/exercises/prefectures.csv が存在する"
+    type: file_exists
+    path: dbt/seeds/exercises/prefectures.csv
+    points: 10
+
+  - id: macro-file-exists
+    description: "dbt/macros/exercises/cast_jpy.sql が存在する"
+    type: file_exists
+    path: dbt/macros/exercises/cast_jpy.sql
+    points: 10
+
+  - id: seed-node-declared
+    description: "manifest に seed.local_analytics.prefectures が登録されている"
+    type: manifest_node_exists
+    node: seed.local_analytics.prefectures
+    points: 15
+
+  # ----- behavioural (dbt seed コマンド + test) -----
+
+  - id: dbt-seed-runs
+    description: "dbt seed --select prefectures が成功する"
+    type: dbt_command
+    command: ["dbt", "seed", "--select", "prefectures"]
+    points: 15
+
+  - id: prefectures-tests-pass
+    description: "prefectures seed の dbt test (not_null / unique / accepted_values) が PASS"
+    type: dbt_test_passes
+    select: prefectures
+    min_pass: 3
+    points: 20
+
+  # ----- data check -----
+
+  - id: prefectures-row-count-47
+    description: "staging.prefectures が 47 行 (47 都道府県全て)"
+    type: sql_assert
+    sql: "SELECT count(*)::int FROM staging.prefectures"
+    op: eq
+    expected: 47
+    points: 20

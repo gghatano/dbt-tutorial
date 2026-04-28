@@ -1,0 +1,67 @@
+# Grading definition for 100-knock Topic 6, Problem 6-6 (positive_value with allow_zero arg).
+# Run by: python scripts/grader/grade.py --grading-file docs/exercises/100-knock/topic-6-quality-tests/6-6-positive-value-allow-zero.grading.yaml
+#
+# 採点方針:
+#   - 構造チェック (allow_zero 引数定義 + parse + manifest kwargs) で 50 点
+#   - データチェック (mart の dbt_test_passes + stg の後方互換維持) で 50 点
+#
+# 前提:
+#   - Topic ② ③ ④ ⑤ + Topic ⑥ 6-1〜6-5 完了
+#   - dbt/tests/generic/test_positive_value.sql が 6-5 で 2 引数版で書かれている
+#   - 学習者は test_positive_value.sql を allow_zero=False デフォルト引数版に拡張、
+#     dbt/models/100-knock/topic-5/schema.yml の mart_daily_sales_100knock.total_sales_amount に
+#     positive_value: arguments: allow_zero: true を追加する
+
+exercise: 100-knock-6-6-positive-value-allow-zero
+title: "100-knock 6-6: positive_value を引数付き (allow_zero) に拡張、mart に適用"
+passing_score: 80
+
+expects_learner_files:
+  - dbt/tests/generic/test_positive_value.sql
+  - dbt/models/100-knock/topic-5/schema.yml
+
+checks:
+  # ----- 構造チェック (50 点) -----
+
+  - id: positive-value-allow-zero-arg-defined
+    description: "test_positive_value.sql に allow_zero 引数定義がある"
+    type: shell_command
+    command: ["bash", "-c", "grep -E 'positive_value\\s*\\(\\s*model\\s*,\\s*column_name\\s*,\\s*allow_zero' dbt/tests/generic/test_positive_value.sql"]
+    expect_exit_code: 0
+    points: 15
+
+  - id: parse-success
+    description: "dbt parse が成功する (引数付き generic test の Jinja 構文 OK)"
+    type: dbt_command
+    command: ["dbt", "parse"]
+    points: 10
+
+  - id: positive-value-mart-test-registered
+    description: "manifest に positive_value test (mart_daily_sales_100knock.total_sales_amount) が登録されている"
+    type: manifest_node_exists
+    node: test.local_analytics.positive_value_mart_daily_sales_100knock_total_sales_amount
+    points: 10
+
+  - id: positive-value-mart-allow-zero-kwarg
+    description: "manifest 上で test の test_metadata.kwargs.allow_zero が true になっている"
+    type: shell_command
+    command: ["bash", "-c", "python3 -c \"import json,sys; m=json.load(open('dbt/target/manifest.json')); n=m['nodes']['test.local_analytics.positive_value_mart_daily_sales_100knock_total_sales_amount']; assert n['test_metadata']['kwargs'].get('allow_zero') is True, n['test_metadata']['kwargs']; print('allow_zero=true confirmed')\""]
+    expect_exit_code: 0
+    expect_stdout_match: "allow_zero=true"
+    points: 15
+
+  # ----- データチェック (50 点) -----
+
+  - id: mart-positive-value-test-passes
+    description: "mart_daily_sales_100knock の test が PASS (allow_zero=true で 0 円の日も許容)"
+    type: dbt_test_passes
+    select: mart_daily_sales_100knock
+    min_pass: 5
+    points: 25
+
+  - id: stg-positive-value-still-strict
+    description: "stg_orders_100knock の positive_value test も引き続き PASS (デフォルト False で後方互換)"
+    type: dbt_test_passes
+    select: stg_orders_100knock
+    min_pass: 8
+    points: 25

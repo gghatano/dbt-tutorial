@@ -1,0 +1,90 @@
+# Grading for 100-knock Topic 8 / Q8: +grants: config を dbt_project.yml に宣言 (hook 不要)
+# Run: python3 scripts/grader/grade.py --grading-file docs/exercises/100-knock/topic-8-reuse/8-8-grants-config.grading.yaml
+#
+# 採点方針:
+#   - 構造チェック (dbt_project.yml に grants ブロック)        20
+#   - 動作チェック (build 成功 + apply grants 複数行)         40
+#   - 反証チェック (新 mart にも grant 自動伝播 + hook 不要)  40
+#   合計 100、合格 80
+#
+# 前提:
+#   - Topic ② 〜 ⑤ + Topic ⑧ 8-1〜8-7 完了
+#   - dbt/models/100-knock/topic-5/ に mart_*_100knock が複数存在
+#   - dbt/models/100-knock/topic-8/ に 8-7 で作った mart_customer_avg_order_100knock 等が 1 本以上ある
+
+exercise: 100-knock-8-8-grants-config
+title: "8-8: +grants: 宣言で readonly_user に SELECT 自動付与 (1 宣言 → N mart の再利用)"
+passing_score: 80
+
+expects_learner_files:
+  - dbt/dbt_project.yml
+
+checks:
+  # ----- 構造チェック (20点) -----
+
+  - id: grants-block-in-project-yml
+    description: "dbt/dbt_project.yml に +grants: ブロック + readonly_user 宣言が存在 (topic-5 / topic-8 の少なくとも片方)"
+    type: shell_command
+    command: |
+      set -euo pipefail
+      grants_lines=$(grep -cE '^\s*\+?grants:' dbt/dbt_project.yml || echo 0)
+      ro_lines=$(grep -cE 'readonly_user' dbt/dbt_project.yml || echo 0)
+      echo "grants_lines=${grants_lines} readonly_user_lines=${ro_lines}"
+      test "${grants_lines}" -ge 1
+      test "${ro_lines}" -ge 1
+    points: 20
+
+  # ----- 動作チェック (40点) -----
+
+  - id: dbt-build-100knock-marts-success
+    description: "dbt build --select 100-knock.topic-5 100-knock.topic-8 が成功する"
+    type: shell_command
+    command: |
+      set -euo pipefail
+      cd dbt
+      dbt build --select 100-knock.topic-5 100-knock.topic-8 \
+        --profiles-dir . 2>&1 | tee /tmp/8-8-build.log
+      grep -E 'ERROR=0' /tmp/8-8-build.log >/dev/null
+      ! grep -E 'ERROR=[1-9]' /tmp/8-8-build.log >/dev/null
+    points: 20
+
+  - id: apply-grants-log-multiple
+    description: "dbt build のログに 'applied grants' 行が 2 行以上ある (= +grants: が複数 mart に発火)"
+    type: shell_command
+    command: |
+      set -euo pipefail
+      cd dbt
+      dbt build --select 100-knock.topic-5 100-knock.topic-8 \
+        --profiles-dir . 2>&1 | tee /tmp/8-8-grants.log
+      n=$(grep -c 'applied grants' /tmp/8-8-grants.log || echo 0)
+      echo "apply_grants_lines=${n}"
+      test "${n}" -ge 2
+    points: 20
+
+  # ----- 反証チェック (40点): 新 mart にも grant が自動伝播 + hook を増やしていない -----
+
+  - id: readonly-can-select-topic5-mart
+    description: "readonly_user が topic-5 由来の mart (mart_top_rated_products_100knock) に SELECT 権限を持つ"
+    type: sql_assert
+    sql: "SELECT has_table_privilege('readonly_user', 'marts.mart_top_rated_products_100knock', 'SELECT')::int"
+    op: eq
+    expected: 1
+    points: 15
+
+  - id: readonly-can-select-topic8-mart
+    description: "readonly_user が topic-8 由来の mart (mart_customer_avg_order_100knock) にも自動で SELECT 権限を持つ"
+    type: sql_assert
+    sql: "SELECT has_table_privilege('readonly_user', 'marts.mart_customer_avg_order_100knock', 'SELECT')::int"
+    op: eq
+    expected: 1
+    points: 15
+
+  - id: no-on-run-end-grant-hook-added
+    description: "dbt_project.yml に grant_select_on_marts 系 hook 呼び出しが新規追加されていない (= 宣言的解単体)"
+    type: shell_command
+    command: |
+      set -euo pipefail
+      n=$(grep -cE 'grant_select_on_marts|grant select on all tables' dbt/dbt_project.yml || echo 0)
+      echo "hook_grant_calls=${n}"
+      test "${n}" -eq 0
+    points: 10

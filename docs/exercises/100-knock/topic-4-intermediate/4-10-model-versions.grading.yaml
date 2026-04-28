@@ -1,0 +1,72 @@
+# Grading for 100-knock Topic 4 / Q10: int_order_details_100knock を model versions で v1/v2 並走。
+# Run: python3 scripts/grader/grade.py --grading-file docs/exercises/100-knock/topic-4-intermediate/4-10-model-versions.grading.yaml
+#
+# 前提: dbt 1.5+ (model versions 機能)。
+# manifest 上の node id 形式: model.<project>.<name>.v<N> (末尾に .v1 / .v2 が付く)。
+
+exercise: 100-knock-4-10-model-versions
+title: "4-10: int_order_details_100knock を model versions で v1 (税抜) / v2 (税込列追加) 並走"
+passing_score: 80
+
+expects_learner_files:
+  - dbt/models/100-knock/topic-4/int_order_details_100knock.sql
+  - dbt/models/100-knock/topic-4/int_order_details_100knock_v2.sql
+  - dbt/models/100-knock/topic-4/schema.yml
+
+checks:
+  - id: v2-file-exists
+    description: "dbt/models/100-knock/topic-4/int_order_details_100knock_v2.sql が存在する"
+    type: file_exists
+    path: dbt/models/100-knock/topic-4/int_order_details_100knock_v2.sql
+    min_size_bytes: 100
+    points: 15
+
+  - id: schema-yml-has-versions-block
+    description: "schema.yml に versions: ブロックが書かれている (v: 1 と v: 2 両方)"
+    type: shell_command
+    command: |
+      set -euo pipefail
+      python3 -c "
+      import yaml
+      with open('dbt/models/100-knock/topic-4/schema.yml') as f:
+          s = yaml.safe_load(f)
+      models = s.get('models', [])
+      target = next((m for m in models if m.get('name') == 'int_order_details_100knock'), None)
+      assert target is not None, 'int_order_details_100knock not in schema.yml'
+      versions = target.get('versions') or []
+      vs = sorted(v.get('v') for v in versions)
+      print('versions=' + repr(vs))
+      assert 1 in vs and 2 in vs, f'expected v1 and v2 in versions, got {vs}'
+      "
+    points: 20
+
+  - id: dbt-parse-success
+    description: "dbt parse が成功する (versions: 構文が正しい)"
+    type: dbt_command
+    command: ["parse"]
+    points: 15
+
+  - id: manifest-v1-node-exists
+    description: "manifest に model.local_analytics.int_order_details_100knock.v1 が登録されている"
+    type: manifest_node_exists
+    node: model.local_analytics.int_order_details_100knock.v1
+    points: 15
+
+  - id: manifest-v2-node-exists
+    description: "manifest に model.local_analytics.int_order_details_100knock.v2 が登録されている"
+    type: manifest_node_exists
+    node: model.local_analytics.int_order_details_100knock.v2
+    points: 15
+
+  - id: dbt-ls-shows-both-versions
+    description: "dbt ls --select int_order_details_100knock の出力に v1 / v2 両方が出る"
+    type: shell_command
+    command: |
+      set -euo pipefail
+      cd dbt
+      out=$(dbt ls --select int_order_details_100knock --profiles-dir . 2>&1 | tail -n 30)
+      echo "${out}"
+      n=$(echo "${out}" | grep -cE '\.v[12]$' || echo 0)
+      echo "v1_v2_node_count=${n}"
+      test "${n}" -ge 2
+    points: 20

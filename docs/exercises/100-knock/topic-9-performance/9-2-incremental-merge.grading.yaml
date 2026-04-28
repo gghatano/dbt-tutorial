@@ -1,0 +1,61 @@
+# Grading for 100-knock Topic 9 / Q2: mart_orders_incremental_100knock を incremental + merge 化、差分 1000 行追加して 11000 行に。
+# Run: python3 scripts/grader/grade.py --grading-file docs/exercises/100-knock/topic-9-performance/9-2-incremental-merge.grading.yaml
+#
+# 前提: 採点直前に generate_orders_diff.py で raw.orders に 1000 行 append 済み、
+# かつ +mart_orders_incremental_100knock で 2 回 dbt run 済み (= 最終 11000 行)。
+
+exercise: 100-knock-9-2-incremental-merge
+title: "9-2: mart_orders_incremental_100knock を incremental + merge で実装"
+passing_score: 80
+
+expects_learner_files:
+  - dbt/models/100-knock/topic-9/mart_orders_incremental_100knock.sql
+  - scripts/100-knock/topic-9/generate_orders_diff.py
+
+checks:
+  - id: model-file-exists
+    description: "mart_orders_incremental_100knock.sql が存在する"
+    type: file_exists
+    path: dbt/models/100-knock/topic-9/mart_orders_incremental_100knock.sql
+    min_size_bytes: 100
+    points: 10
+
+  - id: diff-script-exists
+    description: "generate_orders_diff.py が存在する (差分データ生成スクリプト)"
+    type: file_exists
+    path: scripts/100-knock/topic-9/generate_orders_diff.py
+    min_size_bytes: 200
+    points: 10
+
+  - id: model-config-incremental-merge
+    description: "manifest 上 materialized=incremental, unique_key=order_id, incremental_strategy=merge"
+    type: manifest_config
+    node: model.local_analytics.mart_orders_incremental_100knock
+    expected:
+      materialized: incremental
+      unique_key: order_id
+      incremental_strategy: merge
+    points: 30
+
+  - id: dbt-run-incremental
+    description: "dbt run --select mart_orders_incremental_100knock が成功する (差分マージ run)"
+    type: dbt_command
+    command: ["run", "--select", "mart_orders_incremental_100knock"]
+    points: 15
+
+  - id: row-count-after-diff
+    description: "marts.mart_orders_incremental_100knock が 11,000 行 (10000 + 1000 差分マージ)"
+    type: sql_assert
+    sql: "SELECT count(*) FROM marts.mart_orders_incremental_100knock"
+    op: eq
+    expected: 11000
+    points: 25
+
+  - id: is-incremental-used
+    description: "SQL に is_incremental() が使われている (差分判定の where 句)"
+    type: shell_command
+    command: |
+      set -euo pipefail
+      grep -q "is_incremental()" dbt/models/100-knock/topic-9/mart_orders_incremental_100knock.sql
+      echo "is_incremental() found"
+    points: 10

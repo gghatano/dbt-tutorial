@@ -1,0 +1,68 @@
+# Grading for 100-knock Topic 10 / Q2: ER 図を Mermaid erDiagram で書く
+# Run: python3 scripts/grader/grade.py --grading-file docs/exercises/100-knock/topic-10-integration/10-2-er-diagram.grading.yaml
+#
+# 採点方針:
+#   - file_exists で存在確認 (10)
+#   - shell_command で必須シンタックス (mermaid / erDiagram / cardinality / entity / PK) を grep (90)
+#   合計 100、合格 80。
+
+exercise: 100-knock-10-2-er-diagram
+title: "10-2: ER 図を Mermaid erDiagram で書き、PK/FK/cardinality を明示"
+passing_score: 80
+
+expects_learner_files:
+  - docs/exercises/100-knock/topic-10-integration/learner/er-diagram.md
+
+checks:
+  - id: er-diagram-md-exists
+    description: "learner/er-diagram.md が存在し、内容が 200 bytes 以上ある"
+    type: file_exists
+    path: docs/exercises/100-knock/topic-10-integration/learner/er-diagram.md
+    min_size_bytes: 200
+    points: 10
+
+  - id: contains-mermaid-fence
+    description: "mermaid コードフェンス (```mermaid) が含まれる"
+    type: shell_command
+    command: |
+      set -euo pipefail
+      grep -E '^[[:space:]]*```mermaid' docs/exercises/100-knock/topic-10-integration/learner/er-diagram.md >/dev/null
+    points: 15
+
+  - id: contains-er-diagram-keyword
+    description: "erDiagram キーワードが含まれる"
+    type: shell_command
+    command: |
+      set -euo pipefail
+      grep -E 'erDiagram' docs/exercises/100-knock/topic-10-integration/learner/er-diagram.md >/dev/null
+    points: 20
+
+  - id: contains-cardinality
+    description: "少なくとも 1 つの cardinality 表記 (||--o{ / ||--|| / }o--o{ / ||--|{ など) が含まれる"
+    type: shell_command
+    command: |
+      set -euo pipefail
+      f=docs/exercises/100-knock/topic-10-integration/learner/er-diagram.md
+      grep -E '\|\|--o\{|\}o--o\{|\|\|--\|\||\|\|--\|\{|\}o--\|\||\}\|--\|\{' "${f}" >/dev/null
+    points: 20
+
+  - id: contains-min-2-entities
+    description: "少なくとも 2 つのエンティティ定義ブロック (Identifier { ... }) が含まれる"
+    type: shell_command
+    command: |
+      set -euo pipefail
+      f=docs/exercises/100-knock/topic-10-integration/learner/er-diagram.md
+      # Mermaid の entity ブロック開始行を粗くカウント。 "Identifier {" の形を数える。
+      n=$(grep -cE '^[[:space:]]+[A-Za-z_][A-Za-z0-9_]*[[:space:]]*\{[[:space:]]*$' "${f}" || echo 0)
+      echo "entity_blocks=${n}"
+      test "${n}" -ge 2
+    points: 20
+
+  - id: contains-pk-label
+    description: "少なくとも 1 列に PK ラベルが付いている"
+    type: shell_command
+    command: |
+      set -euo pipefail
+      f=docs/exercises/100-knock/topic-10-integration/learner/er-diagram.md
+      grep -E '\bPK\b' "${f}" >/dev/null
+    points: 15

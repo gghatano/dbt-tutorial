@@ -1,0 +1,65 @@
+# Grading for 100-knock Topic 4 / Q7: int_orders_enriched_100knock を view → table に切替、build 時間を比較。
+# Run: python3 scripts/grader/grade.py --grading-file docs/exercises/100-knock/topic-4-intermediate/4-7-materialization-table-vs-view.grading.yaml
+#
+# 採点は「最終 state = table 版」 を前提。比較ログは materialization-comparison.md に残す。
+
+exercise: 100-knock-4-7-materialization-table-vs-view
+title: "4-7: int_orders_enriched_100knock を view → table 化、build 時間比較"
+passing_score: 80
+
+expects_learner_files:
+  - dbt/models/100-knock/topic-4/int_orders_enriched_100knock.sql
+  - docs/exercises/100-knock/topic-4-intermediate/materialization-comparison.md
+
+checks:
+  - id: model-file-exists
+    description: "int_orders_enriched_100knock.sql が存在する"
+    type: file_exists
+    path: dbt/models/100-knock/topic-4/int_orders_enriched_100knock.sql
+    min_size_bytes: 100
+    points: 10
+
+  - id: comparison-doc-exists
+    description: "materialization-comparison.md が存在する (200 bytes 以上)"
+    type: file_exists
+    path: docs/exercises/100-knock/topic-4-intermediate/materialization-comparison.md
+    min_size_bytes: 200
+    points: 10
+
+  - id: model-config-materialized-table
+    description: "manifest 上 int_orders_enriched_100knock の materialized=table"
+    type: manifest_config
+    node: model.local_analytics.int_orders_enriched_100knock
+    expected:
+      materialized: table
+    points: 25
+
+  - id: dbt-run-builds-table
+    description: "dbt run --select int_orders_enriched_100knock が成功する"
+    type: dbt_command
+    command: ["run", "--select", "int_orders_enriched_100knock"]
+    points: 20
+
+  - id: postgres-relkind-is-table
+    description: "DB 上で pg_class.relkind = 'r' (table として物質化されている)"
+    type: sql_assert
+    sql: |
+      SELECT relkind::text
+      FROM pg_class c
+      JOIN pg_namespace n ON c.relnamespace = n.oid
+      WHERE n.nspname = 'intermediate'
+        AND c.relname = 'int_orders_enriched_100knock'
+    op: eq
+    expected: "r"
+    points: 25
+
+  - id: comparison-doc-mentions-both
+    description: "materialization-comparison.md に view と table 両方への言及がある"
+    type: shell_command
+    command: |
+      set -euo pipefail
+      doc=docs/exercises/100-knock/topic-4-intermediate/materialization-comparison.md
+      grep -qE 'view' "$doc"
+      grep -qE 'table' "$doc"
+      echo "doc mentions both view and table"
+    points: 10

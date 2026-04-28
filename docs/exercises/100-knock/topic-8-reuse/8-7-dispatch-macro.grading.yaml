@@ -1,0 +1,74 @@
+# Grading for 100-knock Topic 8 / Q7: dispatch macro safe_divide (default + postgres 別実装)
+# Run: python3 scripts/grader/grade.py --grading-file docs/exercises/100-knock/topic-8-reuse/8-7-dispatch-macro.grading.yaml
+#
+# 採点方針:
+#   - 構造チェック (file_exists + dispatch 構造 + 3 macro 定義)              60
+#   - 動作チェック (mart で safe_divide 呼ばれている + 実出力が壊れない)    40
+#   合計 100、合格 80
+
+exercise: 100-knock-8-7-dispatch-macro
+title: "8-7: dispatch macro safe_divide(num, den) を default + postgres 別実装で書く"
+passing_score: 80
+
+expects_learner_files:
+  - dbt/macros/100-knock/topic-8/safe_divide.sql
+
+checks:
+  # ----- 構造チェック (60点) -----
+
+  - id: safe-divide-macro-file-exists
+    description: "dbt/macros/100-knock/topic-8/safe_divide.sql が存在する"
+    type: file_exists
+    path: dbt/macros/100-knock/topic-8/safe_divide.sql
+    min_size_bytes: 100
+    points: 15
+
+  - id: dispatch-structure-grep
+    description: "safe_divide.sql に adapter.dispatch('safe_divide', ...) の呼び出しが含まれる"
+    type: shell_command
+    command: |
+      set -euo pipefail
+      f=dbt/macros/100-knock/topic-8/safe_divide.sql
+      n=$(grep -cE "adapter\\.dispatch\\(\\s*['\"]safe_divide['\"]" "$f" || echo 0)
+      echo "dispatch_calls=${n}"
+      test "${n}" -ge 1
+    points: 25
+
+  - id: three-macro-defs-grep
+    description: "safe_divide.sql に safe_divide / default__safe_divide / postgres__safe_divide の 3 macro 定義がある"
+    type: shell_command
+    command: |
+      set -euo pipefail
+      f=dbt/macros/100-knock/topic-8/safe_divide.sql
+      pub=$(grep -cE "macro\\s+safe_divide\\s*\\(" "$f" || echo 0)
+      def=$(grep -cE "macro\\s+default__safe_divide\\s*\\(" "$f" || echo 0)
+      pg=$(grep -cE "macro\\s+postgres__safe_divide\\s*\\(" "$f" || echo 0)
+      echo "public=${pub} default=${def} postgres=${pg}"
+      test "${pub}" -ge 1
+      test "${def}" -ge 1
+      test "${pg}" -ge 1
+    points: 20
+
+  # ----- 動作チェック (40点) -----
+
+  - id: mart-uses-safe-divide
+    description: "100-knock の mart いずれか 1 本で {{ safe_divide(...) }} が呼ばれている"
+    type: shell_command
+    command: |
+      set -euo pipefail
+      n=$(grep -rE "safe_divide\\s*\\(" dbt/models/100-knock/ 2>/dev/null | wc -l | tr -d ' ')
+      echo "mart_safe_divide_calls=${n}"
+      test "${n}" -ge 1
+    points: 15
+
+  - id: safe-divide-no-zero-div-error
+    description: "100-knock の任意の mart で run-operation safe_divide が compile 成功する (= dispatch が壊れていない)"
+    type: shell_command
+    command: |
+      set -euo pipefail
+      cd dbt
+      dbt run-operation safe_divide --args '{num: "10", den: "0"}' --profiles-dir . 2>&1 | tee /tmp/8-7-runop.log
+      grep -E 'Compiled (in)?\b|Completed successfully|nullif' /tmp/8-7-runop.log >/dev/null \
+        || grep -E 'Done|RUN' /tmp/8-7-runop.log >/dev/null
+      ! grep -E 'ERROR|error' /tmp/8-7-runop.log >/dev/null
+    points: 25

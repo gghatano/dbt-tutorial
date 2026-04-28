@@ -1,0 +1,66 @@
+# Grading for 100-knock Topic 9 / Q4: merge_exclude_columns で updated_at を merge から除外。
+# Run: python3 scripts/grader/grade.py --grading-file docs/exercises/100-knock/topic-9-performance/9-4-merge-exclude-columns.grading.yaml
+#
+# 採点は「config 宣言 + 生成 SQL に効果が出ている + 既存 row の updated_at が古い」 を確認。
+# dbt 1.6+ が前提 (古いと config 自体が無視される)。
+
+exercise: 100-knock-9-4-merge-exclude-columns
+title: "9-4: merge_exclude_columns で updated_at を merge から除外"
+passing_score: 80
+
+expects_learner_files:
+  - dbt/models/100-knock/topic-9/mart_orders_incremental_100knock.sql
+
+checks:
+  - id: model-file-exists
+    description: "mart_orders_incremental_100knock.sql が存在する"
+    type: file_exists
+    path: dbt/models/100-knock/topic-9/mart_orders_incremental_100knock.sql
+    min_size_bytes: 100
+    points: 10
+
+  - id: merge-exclude-columns-in-sql
+    description: "SQL 内に merge_exclude_columns=['updated_at'] 宣言がある"
+    type: shell_command
+    command: |
+      set -euo pipefail
+      grep -E "merge_exclude_columns\s*=\s*\[\s*'updated_at'\s*\]" \
+          dbt/models/100-knock/topic-9/mart_orders_incremental_100knock.sql
+      echo "merge_exclude_columns=['updated_at'] declared"
+    points: 25
+
+  - id: dbt-run-incremental-with-exclude
+    description: "dbt run --select mart_orders_incremental_100knock が成功する"
+    type: dbt_command
+    command: ["run", "--select", "mart_orders_incremental_100knock"]
+    points: 20
+
+  - id: incremental-config-still-merge
+    description: "manifest 上 materialized=incremental + incremental_strategy=merge を維持"
+    type: manifest_config
+    node: model.local_analytics.mart_orders_incremental_100knock
+    expected:
+      materialized: incremental
+      incremental_strategy: merge
+    points: 20
+
+  - id: updated-at-is-recent-for-new-rows
+    description: "新規 row (order_id >= 11500) の updated_at が直近 1 時間以内 = 新規 row には新しい timestamp が付いている"
+    type: sql_assert
+    sql: |
+      SELECT count(*)::bigint
+      FROM marts.mart_orders_incremental_100knock
+      WHERE order_id >= 11500
+        AND updated_at >= now() - interval '1 hour'
+    op: gt
+    expected: 0
+    points: 15
+
+  - id: target-run-sql-exists
+    description: "target/run/ 配下に生成 SQL がある (merge 文を読める)"
+    type: shell_command
+    command: |
+      set -euo pipefail
+      f="dbt/target/run/local_analytics/models/100-knock/topic-9/mart_orders_incremental_100knock.sql"
+      test -f "$f" && echo "compiled run SQL exists at $f"
+    points: 10

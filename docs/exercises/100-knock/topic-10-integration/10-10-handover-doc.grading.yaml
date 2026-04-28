@@ -1,0 +1,82 @@
+# Grading definition for 100-knock Topic 10, Problem 10-10 (open-ended / 集大成)
+# (HANDOVER.md with 6 required elements: 要件定義 / ER / KPI / 運用 / TODO / 展望)
+# Run by:
+#   python3 scripts/grader/grade.py \
+#     --grading-file docs/exercises/100-knock/topic-10-integration/10-10-handover-doc.grading.yaml
+#
+# 採点方針 (open-ended / 集大成):
+#   - 「書かれていれば部分点」、内容質より仕組み
+#   - 評価は人手前提、CI は形式のみ確認
+#   - file_exists + 必須 6 キーワード grep + 文字数 >= 2000 の機械的チェック
+
+exercise: 100-knock-10-10-handover-doc
+title: "100-knock 10-10 (open-ended / 集大成): 自分の DAG を引き継ぐ HANDOVER.md を PR で残す"
+passing_score: 80
+
+expects_learner_files:
+  - docs/exercises/100-knock/topic-10-integration/learner/HANDOVER.md
+
+checks:
+  # ----- file 存在 + 最低サイズ (10 点) -----
+
+  - id: handover-md-exists
+    description: "learner/HANDOVER.md が存在する (最低 500 byte)"
+    type: file_exists
+    path: docs/exercises/100-knock/topic-10-integration/learner/HANDOVER.md
+    min_size_bytes: 500
+    points: 10
+
+  # ----- 必須 6 要素のキーワード grep (60 点 = 各 10 点) -----
+
+  - id: keyword-requirements
+    description: "本文に「要件定義」のキーワードがある (1. 要件定義 link)"
+    type: shell_command
+    command: |
+      set -euo pipefail
+      grep -q '要件定義' docs/exercises/100-knock/topic-10-integration/learner/HANDOVER.md
+    points: 10
+
+  - id: keyword-er
+    description: "本文に「ER」のキーワードがある (2. ER 図)"
+    type: shell_command
+    command: |
+      set -euo pipefail
+      grep -qE 'ER[^A-Za-z]|ER$' docs/exercises/100-knock/topic-10-integration/learner/HANDOVER.md
+    points: 10
+
+  - id: keyword-kpi
+    description: "本文に「KPI」のキーワードがある (3. KPI と source の対応表)"
+    type: shell_command
+    command: |
+      set -euo pipefail
+      grep -q 'KPI' docs/exercises/100-knock/topic-10-integration/learner/HANDOVER.md
+    points: 10
+
+  - id: keyword-operation
+    description: "本文に「運用」のキーワードがある (4. 運用フロー)"
+    type: shell_command
+    command: |
+      set -euo pipefail
+      grep -q '運用' docs/exercises/100-knock/topic-10-integration/learner/HANDOVER.md
+    points: 10
+
+  - id: keyword-todo-and-prospect
+    description: "本文に「TODO」と「展望」のキーワードがある (5. TODO / リスク + 6. 展望)"
+    type: shell_command
+    command: |
+      set -euo pipefail
+      grep -q 'TODO' docs/exercises/100-knock/topic-10-integration/learner/HANDOVER.md
+      grep -q '展望' docs/exercises/100-knock/topic-10-integration/learner/HANDOVER.md
+    points: 20
+
+  # ----- 文字数 2000 以上 (集大成なので 10-8 より長め) (30 点) -----
+
+  - id: handover-min-char-2000
+    description: "本文の文字数が 2000 以上 (集大成として最低限の厚み)"
+    type: shell_command
+    command: |
+      set -euo pipefail
+      n=$(wc -m < docs/exercises/100-knock/topic-10-integration/learner/HANDOVER.md | tr -d ' ')
+      echo "char_count=${n}"
+      test "${n}" -ge 2000
+    points: 30

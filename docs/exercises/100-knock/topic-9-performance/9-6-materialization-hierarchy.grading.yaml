@@ -1,0 +1,98 @@
+# Grading for 100-knock Topic 9 / Q6: dbt_project.yml で materialization 階層宣言 + 1 model override.
+# Run: python3 scripts/grader/grade.py --grading-file docs/exercises/100-knock/topic-9-performance/9-6-materialization-hierarchy.grading.yaml
+#
+# 注意: 本問は学習者が dbt/dbt_project.yml を編集する。MVP セクション無傷を 1 check で防御。
+
+exercise: 100-knock-9-6-materialization-hierarchy
+title: "9-6: dbt_project.yml で materialization をレイヤーごとに宣言、1 model だけ config() で override"
+passing_score: 80
+
+expects_learner_files:
+  - dbt/dbt_project.yml
+  - dbt/models/100-knock/topic-5/mart_orders_incremental_100knock.sql
+
+checks:
+  - id: dbt-project-100knock-topic3-view
+    description: "100-knock.topic-3 に +materialized: view が宣言されている"
+    type: shell_command
+    command: |
+      set -euo pipefail
+      python3 -c "
+      import yaml
+      with open('dbt/dbt_project.yml') as f:
+          cfg = yaml.safe_load(f)
+      knock = cfg['models']['local_analytics'].get('100-knock')
+      assert knock is not None, '100-knock: section not found'
+      t3 = knock.get('topic-3')
+      assert t3 is not None, 'topic-3 missing'
+      mat = t3.get('+materialized')
+      assert mat == 'view', f'topic-3 +materialized must be view, got {mat!r}'
+      print(f'topic-3 ok: +materialized={mat}')
+      "
+    points: 15
+
+  - id: dbt-project-100knock-topic4-ephemeral
+    description: "100-knock.topic-4 に +materialized: ephemeral が宣言されている"
+    type: shell_command
+    command: |
+      set -euo pipefail
+      python3 -c "
+      import yaml
+      with open('dbt/dbt_project.yml') as f:
+          cfg = yaml.safe_load(f)
+      t4 = cfg['models']['local_analytics']['100-knock'].get('topic-4')
+      assert t4 is not None, 'topic-4 missing'
+      mat = t4.get('+materialized')
+      assert mat == 'ephemeral', f'topic-4 +materialized must be ephemeral, got {mat!r}'
+      print(f'topic-4 ok: +materialized={mat}')
+      "
+    points: 15
+
+  - id: dbt-project-100knock-topic5-table
+    description: "100-knock.topic-5 に +materialized: table が宣言されている"
+    type: shell_command
+    command: |
+      set -euo pipefail
+      python3 -c "
+      import yaml
+      with open('dbt/dbt_project.yml') as f:
+          cfg = yaml.safe_load(f)
+      t5 = cfg['models']['local_analytics']['100-knock'].get('topic-5')
+      assert t5 is not None, 'topic-5 missing'
+      mat = t5.get('+materialized')
+      assert mat == 'table', f'topic-5 +materialized must be table, got {mat!r}'
+      print(f'topic-5 ok: +materialized={mat}')
+      "
+    points: 15
+
+  - id: mvp-sections-intact
+    description: "MVP の staging: / intermediate: / marts: セクションが無傷"
+    type: shell_command
+    command: |
+      set -euo pipefail
+      python3 -c "
+      import yaml
+      with open('dbt/dbt_project.yml') as f:
+          cfg = yaml.safe_load(f)
+      la = cfg['models']['local_analytics']
+      for layer, expected_mat in [('staging', 'view'), ('intermediate', 'view'), ('marts', 'table')]:
+          sec = la.get(layer)
+          assert sec is not None, f'MVP layer {layer} missing'
+          assert sec.get('+materialized') == expected_mat, f'MVP {layer} altered'
+          print(f'{layer} ok: +materialized={sec.get(\"+materialized\")}')
+      "
+    points: 10
+
+  - id: mart-incremental-config-override
+    description: "mart_orders_incremental_100knock の materialized が manifest 上 incremental (config() override が効いている)"
+    type: manifest_config
+    node: model.local_analytics.mart_orders_incremental_100knock
+    expected:
+      materialized: incremental
+    points: 30
+
+  - id: dbt-parse-success
+    description: "dbt parse が成功する (dbt_project.yml が文法的に正しい)"
+    type: dbt_command
+    command: ["parse"]
+    points: 15

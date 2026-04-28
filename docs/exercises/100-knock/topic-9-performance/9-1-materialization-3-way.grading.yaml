@@ -1,0 +1,66 @@
+# Grading for 100-knock Topic 9 / Q1: int_order_details_100knock を view → table → ephemeral の 3 通りで build、最終 state は table。
+# Run: python3 scripts/grader/grade.py --grading-file docs/exercises/100-knock/topic-9-performance/9-1-materialization-3-way.grading.yaml
+#
+# 採点は「最終 state = table 版」 を前提。比較ログは materialization-comparison.md に残す。
+
+exercise: 100-knock-9-1-materialization-3-way
+title: "9-1: int_order_details_100knock を view/table/ephemeral 3 通りで build、build 時間比較"
+passing_score: 80
+
+expects_learner_files:
+  - dbt/models/100-knock/topic-4/int_order_details_100knock.sql
+  - docs/exercises/100-knock/topic-9-performance/materialization-comparison.md
+
+checks:
+  - id: model-file-exists
+    description: "int_order_details_100knock.sql が存在する"
+    type: file_exists
+    path: dbt/models/100-knock/topic-4/int_order_details_100knock.sql
+    min_size_bytes: 100
+    points: 10
+
+  - id: comparison-doc-exists
+    description: "materialization-comparison.md が存在する (300 bytes 以上)"
+    type: file_exists
+    path: docs/exercises/100-knock/topic-9-performance/materialization-comparison.md
+    min_size_bytes: 300
+    points: 10
+
+  - id: model-config-materialized-table
+    description: "manifest 上 int_order_details_100knock の materialized=table (最終 state)"
+    type: manifest_config
+    node: model.local_analytics.int_order_details_100knock
+    expected:
+      materialized: table
+    points: 25
+
+  - id: dbt-run-builds-table
+    description: "dbt run --select int_order_details_100knock が成功する"
+    type: dbt_command
+    command: ["run", "--select", "int_order_details_100knock"]
+    points: 20
+
+  - id: postgres-relkind-is-table
+    description: "DB 上で pg_class.relkind = 'r' (table として物質化されている)"
+    type: sql_assert
+    sql: |
+      SELECT relkind::text
+      FROM pg_class c
+      JOIN pg_namespace n ON c.relnamespace = n.oid
+      WHERE n.nspname = 'intermediate'
+        AND c.relname = 'int_order_details_100knock'
+    op: eq
+    expected: "r"
+    points: 25
+
+  - id: comparison-doc-mentions-three-strategies
+    description: "materialization-comparison.md に view / table / ephemeral 3 つすべての言及がある"
+    type: shell_command
+    command: |
+      set -euo pipefail
+      doc=docs/exercises/100-knock/topic-9-performance/materialization-comparison.md
+      grep -qE 'view' "$doc"
+      grep -qE 'table' "$doc"
+      grep -qE 'ephemeral' "$doc"
+      echo "doc mentions view / table / ephemeral"
+    points: 10
