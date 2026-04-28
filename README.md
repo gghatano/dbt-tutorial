@@ -22,28 +22,25 @@
 
 ## クイックスタート
 
-```bash
-# 1. ツール
-brew install colima docker docker-compose uv
-brew install hashicorp/tap/terraform
+前提: **Docker / docker-compose / uv / Terraform** が動く環境。OS 別のインストール手順は [docs/setup.md §1](docs/setup.md#1-ツールインストール)を参照(macOS / Linux / WSL2 で動作確認済)。
 
-# 2. Colima + Postgres
-colima start --cpu 4 --memory 8 --disk 20
+```bash
+# 1. Docker daemon が起動していること（macOS は Colima 等、Linux/WSL2 は dockerd / Docker Desktop）
 docker compose up -d postgres
 
-# 3. schema / role を Terraform で構築
+# 2. schema / role を Terraform で構築
 cd infra/terraform && terraform init && terraform apply -auto-approve && cd ../../
 
-# 4. Python 環境 + .env
+# 3. Python 環境 + .env
 uv venv --python 3.12
 uv pip install -r requirements.txt
 cp .env.example .env
 
-# 5. ダミーデータ生成 + raw 投入
+# 4. ダミーデータ生成 + raw 投入
 .venv/bin/python scripts/generate_dummy_data.py
 .venv/bin/python scripts/load_raw_data.py
 
-# 6. dbt 実行（環境変数を流し込んでから dbt/ で実行）
+# 5. dbt 実行（環境変数を流し込んでから dbt/ で実行）
 # 既存 shell に DB_USER/DB_PASSWORD/METABASE_* を export 済みだと .env が効かないので、
 # 新しい shell を開くか、念のため unset してから source する。
 unset DB_USER DB_PASSWORD METABASE_DB_RO_PASSWORD METABASE_ADMIN_PASSWORD 2>/dev/null
@@ -51,7 +48,7 @@ set -a; source .env; set +a
 cd dbt && ../.venv/bin/dbt run --profiles-dir . && ../.venv/bin/dbt test --profiles-dir .
 ```
 
-詰まったら [docs/setup.md](docs/setup.md)（cwd 注釈付きの詳細手順）と [docs/troubleshooting.md](docs/troubleshooting.md) を見る。
+詰まったら [docs/setup.md](docs/setup.md)（OS 別 / cwd 注釈付きの詳細手順）と [docs/troubleshooting.md](docs/troubleshooting.md) を見る。
 
 ## 学習ロードマップ
 
