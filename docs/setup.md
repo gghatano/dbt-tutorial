@@ -66,7 +66,7 @@ terraform init
 terraform apply -auto-approve
 ```
 
-`variables.tf` のデフォルトで `analytics_user / analytics_password` 接続するため、`.env` の値を変えた場合は `-var` か `terraform.tfvars` で同じ値を渡す。
+Terraform は `variables.tf` のデフォルト (`analytics_user / analytics_password`) で superuser として Postgres に接続する。これは `.env` の `DB_USER` (= dbt 用アプリユーザ) とは別系統。superuser のパスワードを変えた場合のみ `-var` か `terraform.tfvars` で渡す。
 
 ### 5. Python 環境
 
@@ -86,7 +86,9 @@ cp .env.example .env
 # 必要なら METABASE_ADMIN_PASSWORD / METABASE_DB_RO_PASSWORD を埋める
 ```
 
-`.env.example` には `analytics_user / analytics_password`（Terraform / 初期化用）が入っている。dbt から接続する `dbt_user / dbt_password` は Terraform が作ったあと、必要に応じて `.env` を書き換える。
+`.env.example` の `DB_USER / DB_PASSWORD` は dbt / loader / smoke test が使うアプリユーザ `dbt_user / dbt_password`（Terraform が作成する。raw/staging/intermediate/marts のオーナー）。Postgres superuser (`analytics_user / analytics_password`) は docker-compose と Terraform が直接参照するため `.env` には書かない。
+
+> ⚠️ もし shell で `DB_USER` 等を既に export しているとそれが優先され、`.env` が効かなくなる。`set -a; source .env; set +a` を流す前に `unset DB_USER DB_PASSWORD` するか、新しい shell を開く。
 
 ### 7. ダミーデータ生成 + raw 投入
 

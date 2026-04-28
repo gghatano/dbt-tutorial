@@ -27,7 +27,7 @@ from dotenv import load_dotenv
 
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-load_dotenv(REPO_ROOT / ".env")
+load_dotenv(REPO_ROOT / ".env", override=True)
 
 BASE = os.environ.get("METABASE_URL", "http://localhost:3000").rstrip("/")
 ADMIN_EMAIL = os.environ["METABASE_ADMIN_EMAIL"]
