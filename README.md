@@ -55,6 +55,7 @@ cd dbt && ../.venv/bin/dbt run --profiles-dir . && ../.venv/bin/dbt test --profi
 1. **クイックスタート**で `dbt run` / `dbt test` を成功させる
 2. **[docs/dashboard.md](docs/dashboard.md)** で Metabase を立ち上げ、marts を可視化する（SQL の結果が画面で見えると学習意欲が上がる）
 3. **[docs/exercises/getting-started.md](docs/exercises/getting-started.md)** から問題を解いて push、CI に採点してもらう
+   - 「まずは 1 問」なら [docs/exercises/first-attempt.md](docs/exercises/first-attempt.md) (Exercise 01 を例にした最短スタート手順)
    - 基本 10 問: 01〜05 (CSV 取り込み / マート / incremental / snapshot / seed+macro) → 06〜10 (exposures / packages / 自作 generic test / hooks / 失敗行のデバッグ)
    - さらに掘り下げたい場合は [docs/exercises/100-knock/](docs/exercises/100-knock/README.md) (10 トピック × 10 問)
 4. **次フェーズ候補**: Airflow / dbt-bigquery / GitHub Actions / Great Expectations（[ADR-0009 §4](docs/decisions/0009-project-completion-summary.md)）
@@ -67,6 +68,7 @@ cd dbt && ../.venv/bin/dbt run --profiles-dir . && ../.venv/bin/dbt test --profi
 - [docs/spec.md](docs/spec.md) — プロジェクト仕様（権威）
 - [docs/dashboard.md](docs/dashboard.md) — Metabase 起動手順
 - [docs/exercises/getting-started.md](docs/exercises/getting-started.md) — 問題で学ぶ dbt(学習者向け入口 / 提出手順)
+- [docs/exercises/first-attempt.md](docs/exercises/first-attempt.md) — 最初の 1 問 (Exercise 01) を解く最短手順
 - [docs/exercises/](docs/exercises/README.md) — 練習問題セット(10 問 + 100 本ノック)
 - [docs/decisions/](docs/decisions/) — Architecture Decision Records
 - [docs/tasks/](docs/tasks/) — phase / task の進捗とログ
